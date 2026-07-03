@@ -1,0 +1,33 @@
+{
+    "name": "mono-repo",
+    "private": true,
+    "workspaces": [
+        "apps/*",
+        "packages/*",
+        "plugins/*",
+        "server"
+    ],
+    "scripts": {
+        "dev": "concurrently -n server,main,sub -c magenta,blue,green \"yarn dev:server\" \"yarn dev:main\" \"yarn dev:sub\"",
+        "dev:server": "yarn workspace server dev",
+        "dev:main": "yarn workspace main dev",
+        "dev:sub": "yarn workspace sub-app dev",
+        "build": "yarn build:all && node scripts/merge-dist.mjs",
+        "build:all": "node scripts/build-all.mjs",
+        "build:main": "yarn workspace main build",
+        "build:sub": "yarn workspace sub-app build",
+        "analyze": "yarn analyze:main && yarn analyze:sub",
+        "analyze:main": "yarn workspace main build --mode analyze",
+        "analyze:sub": "yarn workspace sub-app build --mode analyze"
+    },
+    "devDependencies": {
+        "concurrently": "^9.1.2",
+        "rollup-plugin-visualizer": "^5.14.0"
+    },
+    "resolutions": {
+        "vue": "^3.5.13",
+        "vue-router": "^4.5.0",
+        "pinia": "^2.3.0",
+        "antdv-next": "^1.3.5"
+    }
+}

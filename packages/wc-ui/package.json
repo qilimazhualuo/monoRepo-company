@@ -1,0 +1,23 @@
+{
+    "name": "wc-ui",
+    "version": "0.0.1",
+    "private": true,
+    "type": "module",
+    "main": "./src/index.ts",
+    "module": "./src/index.ts",
+    "types": "./src/index.ts",
+    "exports": {
+        ".": "./src/index.ts"
+    },
+    "peerDependencies": {
+        "antdv-next": "^1.3.5",
+        "pinia": "^2.3.0",
+        "vue": "^3.5.13"
+    },
+    "dependencies": {
+        "antdv-next": "^1.3.5",
+        "pinia": "^2.3.0",
+        "vue": "^3.5.13",
+        "@ant-design/icons-vue": "^7.0.1"
+    }
+}

@@ -1,0 +1,18 @@
+{
+    "name": "vite-plugin-app-base",
+    "version": "0.0.1",
+    "private": true,
+    "type": "module",
+    "main": "./src/index.ts",
+    "module": "./src/index.ts",
+    "types": "./src/index.ts",
+    "exports": {
+        ".": "./src/index.ts"
+    },
+    "peerDependencies": {
+        "vite": "^5.0.0 || ^6.0.0"
+    },
+    "devDependencies": {
+        "vite": "^6.0.5"
+    }
+}
