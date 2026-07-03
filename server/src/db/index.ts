@@ -3,10 +3,12 @@ import { drizzle as drizzlePg, type PostgresJsDatabase } from 'drizzle-orm/postg
 import mysql from 'mysql2/promise'
 import postgres from 'postgres'
 import { env } from '../config/env'
-import { usersMysql, usersPg } from './schema'
 
-let pgDatabase: PostgresJsDatabase | null = null
-let mysqlDatabase: MySql2Database | null = null
+type DatabaseInstance = MySql2Database | PostgresJsDatabase
+
+export type { DatabaseInstance }
+
+let database: DatabaseInstance | null = null
 
 const createPgDatabaseIfNotExists = async () => {
     const adminSql = postgres({
@@ -61,7 +63,7 @@ const initPgTables = async () => {
         )
     `
 
-    pgDatabase = drizzlePg(sql)
+    database = drizzlePg(sql)
 }
 
 const initMysqlTables = async () => {
@@ -85,36 +87,27 @@ const initMysqlTables = async () => {
     `)
     connection.release()
 
-    mysqlDatabase = drizzle(pool)
+    database = drizzle(pool)
 }
 
-export const initDatabase = async () => {
-    if (env.dbDriver === 'mysql') {
-        if (!mysqlDatabase) {
-            await createMysqlDatabaseIfNotExists()
-            await initMysqlTables()
-        }
+export const initDb = async () => {
+    if (database) {
         return
     }
 
-    if (!pgDatabase) {
-        await createPgDatabaseIfNotExists()
-        await initPgTables()
+    if (env.dbDriver === 'mysql') {
+        await createMysqlDatabaseIfNotExists()
+        await initMysqlTables()
+        return
     }
+
+    await createPgDatabaseIfNotExists()
+    await initPgTables()
 }
 
-export const getPgDatabase = () => {
-    if (!pgDatabase) {
-        throw new Error('PostgreSQL 数据库未初始化')
+export const getDb = (): DatabaseInstance => {
+    if (!database) {
+        throw new Error('数据库未初始化，请先调用 initDb()')
     }
-    return pgDatabase
+    return database
 }
-
-export const getMysqlDatabase = () => {
-    if (!mysqlDatabase) {
-        throw new Error('MySQL 数据库未初始化')
-    }
-    return mysqlDatabase
-}
-
-export { usersMysql, usersPg }

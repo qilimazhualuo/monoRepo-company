@@ -6,6 +6,17 @@ const VUE_SHARED_EXPORT_ALIASES: Record<string, string> = {
     createElementVNode: 'createBaseVNode',
 }
 
+const VUE_DIST_IMPORT_NORMALIZE: Record<string, string> = Object.fromEntries(
+    Object.entries(VUE_SHARED_EXPORT_ALIASES).map(([publicName, bundledName]) => [
+        bundledName,
+        publicName,
+    ]),
+)
+
+export const normalizeVueDistExportName = (exportName: string): string => (
+    VUE_DIST_IMPORT_NORMALIZE[exportName] ?? exportName
+)
+
 export const resolveAntdvDefaultExportName = (componentName: string): string => (
     `${toAntdvDistSegment(componentName)}_default`
 )

@@ -211,17 +211,49 @@ export const resolveSharedChunkFileKey = (
     return null
 }
 
-export const toAbsoluteSharedChunkUrl = (chunkFileKey: string, publicPath: string): string => {
+export const toAbsoluteSharedChunkUrl = (
+    chunkFileKey: string,
+    publicPath: string,
+    manifest?: { base: string } | null,
+): string => {
+    if (manifest?.base) {
+        const chunkRelativePath = `${chunkFileKey.replace(/^shared\//, '')}.js`
+        return `${manifest.base}${chunkRelativePath}`
+    }
+
     const chunkFileName = `${chunkFileKey}.js`.replace(/^shared\//, '')
-    return `${publicPath}${chunkFileName}`
+    const normalizedPublicPath = publicPath.endsWith('/') ? publicPath : `${publicPath}/`
+    return `${normalizedPublicPath}${chunkFileName}`
 }
 
-export const toAbsoluteSharedAssetUrl = (assetFileName: string, publicPath: string): string => {
+export const toAbsoluteSharedAssetUrl = (
+    assetFileName: string,
+    publicPath: string,
+    manifest?: { base: string; dir?: string; buildId?: string } | null,
+): string => {
+    if (manifest?.base) {
+        let relativePath = assetFileName.replace(/\\/g, '/')
+        if (manifest.dir && relativePath.startsWith(`${manifest.dir}/`)) {
+            relativePath = relativePath.slice(manifest.dir.length + 1)
+        }
+        else if (manifest.buildId && relativePath.startsWith(`shared/${manifest.buildId}/`)) {
+            relativePath = relativePath.slice(`shared/${manifest.buildId}/`.length)
+        }
+        else {
+            relativePath = relativePath.replace(/^shared\//, '')
+        }
+        return `${manifest.base}${relativePath}`
+    }
+
     const relativePath = assetFileName.replace(/\\/g, '/').replace(/^shared\//, '')
-    return `${publicPath}${relativePath}`
+    const normalizedPublicPath = publicPath.endsWith('/') ? publicPath : `${publicPath}/`
+    return `${normalizedPublicPath}${relativePath}`
 }
 
-export const sharedJsUrlPattern = (publicPath: string) => new RegExp(
-    `${publicPath.replace(/\/$/, '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/[\\w./-]+\\.js`,
-    'g',
-)
+export const sharedJsUrlPattern = (manifestBase: string) => {
+    const publicPrefix = manifestBase.replace(/\/$/, '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    return new RegExp(
+        `${publicPrefix}/[\\w./-]+\\.js`,
+        'g',
+    )
+}

@@ -6,6 +6,7 @@ const monorepoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const deployDistDir = resolve(monorepoRoot, 'dist')
 const hostAppName = 'main'
 const microAppNames = ['sub-app']
+const sharedBundlePattern = /^shared-[a-f0-9]{8}$/i
 
 const copyEntry = (sourcePath, targetPath) => {
     const sourceStat = statSync(sourcePath)
@@ -16,17 +17,21 @@ const copyEntry = (sourcePath, targetPath) => {
     cpSync(sourcePath, targetPath)
 }
 
+const isSharedBundleEntry = (entryName) => (
+    sharedBundlePattern.test(entryName) || entryName === 'shared-manifest.json'
+)
+
 const copyDirectoryExcept = (sourceDir, targetDir, excludeDirNames = []) => {
     mkdirSync(targetDir, { recursive: true })
     for (const entryName of readdirSync(sourceDir)) {
-        if (excludeDirNames.includes(entryName)) {
+        if (excludeDirNames.includes(entryName) || isSharedBundleEntry(entryName)) {
             continue
         }
         copyEntry(resolve(sourceDir, entryName), resolve(targetDir, entryName))
     }
 }
 
-/** 合并 shared：已存在的文件以先写入的为准（基座优先），避免子应用覆盖 pinia 等同名 chunk */
+/** 合并 shared 版本目录：已存在的文件以先写入的为准（基座优先） */
 const mergeSharedEntry = (sourcePath, targetPath) => {
     const sourceStat = statSync(sourcePath)
 
@@ -45,14 +50,22 @@ const mergeSharedEntry = (sourcePath, targetPath) => {
     copyEntry(sourcePath, targetPath)
 }
 
-const mergeSharedDirectory = (sourceSharedDir, targetSharedDir) => {
-    if (!existsSync(sourceSharedDir)) {
+const mergeSharedBundles = (sourceDistDir, targetDistDir) => {
+    if (!existsSync(sourceDistDir)) {
         return
     }
 
-    mkdirSync(targetSharedDir, { recursive: true })
-    for (const entryName of readdirSync(sourceSharedDir)) {
-        mergeSharedEntry(resolve(sourceSharedDir, entryName), resolve(targetSharedDir, entryName))
+    for (const entryName of readdirSync(sourceDistDir)) {
+        if (!sharedBundlePattern.test(entryName)) {
+            continue
+        }
+
+        mergeSharedEntry(resolve(sourceDistDir, entryName), resolve(targetDistDir, entryName))
+    }
+
+    const manifestPath = resolve(sourceDistDir, 'shared-manifest.json')
+    if (existsSync(manifestPath)) {
+        cpSync(manifestPath, resolve(targetDistDir, 'shared-manifest.json'))
     }
 }
 
@@ -68,7 +81,7 @@ const mergeFrontendDist = () => {
     }
 
     copyDirectoryExcept(hostDistDir, deployDistDir, [])
-    mergeSharedDirectory(resolve(hostDistDir, 'shared'), resolve(deployDistDir, 'shared'))
+    mergeSharedBundles(hostDistDir, deployDistDir)
 
     for (const microAppName of microAppNames) {
         const microAppDistDir = resolve(monorepoRoot, 'apps', microAppName, 'dist')
@@ -78,8 +91,8 @@ const mergeFrontendDist = () => {
         }
 
         const microAppDeployDir = resolve(deployDistDir, microAppName)
-        copyDirectoryExcept(microAppDistDir, microAppDeployDir, ['shared'])
-        mergeSharedDirectory(resolve(microAppDistDir, 'shared'), resolve(deployDistDir, 'shared'))
+        copyDirectoryExcept(microAppDistDir, microAppDeployDir, [])
+        mergeSharedBundles(microAppDistDir, deployDistDir)
     }
 
     console.log(`[merge-dist] 已合并到 ${deployDistDir}`)

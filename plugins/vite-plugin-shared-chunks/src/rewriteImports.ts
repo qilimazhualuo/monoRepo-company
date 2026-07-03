@@ -1,4 +1,5 @@
 import { resolveAntdvConsumerChunkKey, toAntdvChunkDefaultExportName, toAbsoluteSharedChunkUrl } from './resolveChunk.ts'
+import type { SharedBuildManifest } from './sharedBuildManifest.ts'
 
 interface NamedImportBinding {
     imported: string
@@ -59,19 +60,24 @@ const rewriteBarrelImports = (
 export const rewriteSharedBarrelImports = (
     code: string,
     publicPath: string,
+    sharedManifest?: SharedBuildManifest | null,
 ): string => {
+    const resolveChunkUrl = (chunkFileKey: string) => (
+        toAbsoluteSharedChunkUrl(chunkFileKey, publicPath, sharedManifest)
+    )
+
     let rewrittenCode = code
 
     rewrittenCode = rewriteBarrelImports(rewrittenCode, 'antdv-next', (exportName) => (
-        toAbsoluteSharedChunkUrl(resolveAntdvConsumerChunkKey(exportName), publicPath)
+        resolveChunkUrl(resolveAntdvConsumerChunkKey(exportName))
     ))
 
     rewrittenCode = rewriteBarrelImports(rewrittenCode, 'wc-ui', () => (
-        toAbsoluteSharedChunkUrl('shared/wc-ui', publicPath)
+        resolveChunkUrl('shared/wc-ui')
     ))
 
     rewrittenCode = rewriteBarrelImports(rewrittenCode, 'wc-utils', () => (
-        toAbsoluteSharedChunkUrl('shared/wc-utils', publicPath)
+        resolveChunkUrl('shared/wc-utils')
     ))
 
     return rewrittenCode

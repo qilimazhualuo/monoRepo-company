@@ -1,15 +1,15 @@
-import { Elysia, t } from 'elysia'
+import bcrypt from 'bcryptjs'
+import { eq } from 'drizzle-orm'
+import type { MySql2Database } from 'drizzle-orm/mysql2'
+import { t } from 'elysia'
+import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import { env } from '../config/env'
-import { initDatabase } from '../db'
-import {
-    findUserById,
-    findUserByUsername,
-    toPublicUser,
-    verifyPassword,
-} from '../models/user'
+import type { BaseApp } from '../app'
+import { usersMysql, usersPg } from '../models/user'
 import { createSliderCaptcha, verifySliderCaptcha } from '../services/captcha'
 import { decryptRsaPassword, getPublicKeyPem } from '../services/crypto'
 import { createAccessToken, verifyAccessToken } from '../services/token'
+import { buildAuthCookie, clearAuthCookie, parseCookies, toPublicUser } from '../utils/auth'
 
 const success = <T>(data: T) => ({
     code: '200',
@@ -21,46 +21,18 @@ const fail = (code: string, message: string) => ({
     data: message,
 })
 
-const parseCookies = (cookieHeader?: string | null) => {
-    if (!cookieHeader) {
-        return {} as Record<string, string>
-    }
-
-    return cookieHeader.split(';').reduce<Record<string, string>>((cookieMap, item) => {
-        const splitIndex = item.indexOf('=')
-        if (splitIndex === -1) {
-            return cookieMap
-        }
-
-        const key = item.slice(0, splitIndex).trim()
-        const value = decodeURIComponent(item.slice(splitIndex + 1).trim())
-        cookieMap[key] = value
-        return cookieMap
-    }, {})
-}
-
-const buildAuthCookie = (token: string, maxAge = env.cookieMaxAge) => {
-    return `${env.cookieName}=${encodeURIComponent(token)}; HttpOnly; Path=/; Max-Age=${maxAge}; SameSite=Lax`
-}
-
-const clearAuthCookie = () => {
-    return `${env.cookieName}=; HttpOnly; Path=/; Max-Age=0; SameSite=Lax`
-}
-
-export const authRoutes = new Elysia({ prefix: '/api/auth' })
-    .get('/public-key', () => {
+export const registerAuthRoutes = <T extends BaseApp>(app: T) => app
+    .get('/api/auth/public-key', () => {
         return success({
             publicKeyPem: getPublicKeyPem(),
         })
     })
-    .get('/getImage', () => {
+    .get('/api/auth/getImage', () => {
         return success(createSliderCaptcha())
     })
     .post(
-        '/login',
-        async ({ body, set }) => {
-            await initDatabase()
-
+        '/api/auth/login',
+        async ({ body, set, db }) => {
             if (body.checkType !== 'slider') {
                 set.status = 400
                 return fail('400', '仅支持滑动验证码登录')
@@ -86,13 +58,25 @@ export const authRoutes = new Elysia({ prefix: '/api/auth' })
                 return fail('400', '密码解密失败')
             }
 
-            const userRecord = await findUserByUsername(body.username)
+            const rows = env.dbDriver === 'mysql'
+                ? await (db as MySql2Database)
+                    .select()
+                    .from(usersMysql)
+                    .where(eq(usersMysql.username, body.username))
+                    .limit(1)
+                : await (db as PostgresJsDatabase)
+                    .select()
+                    .from(usersPg)
+                    .where(eq(usersPg.username, body.username))
+                    .limit(1)
+
+            const userRecord = rows[0]
             if (!userRecord) {
                 set.status = 401
                 return fail('500', '用户名或密码错误')
             }
 
-            const isPasswordValid = await verifyPassword(plainPassword, userRecord.passwordHash)
+            const isPasswordValid = await bcrypt.compare(plainPassword, userRecord.passwordHash)
             if (!isPasswordValid) {
                 set.status = 401
                 return fail('500', '用户名或密码错误')
@@ -116,7 +100,7 @@ export const authRoutes = new Elysia({ prefix: '/api/auth' })
             }),
         },
     )
-    .get('/me', async ({ request, set }) => {
+    .get('/api/auth/me', async ({ request, set, db }) => {
         const cookieMap = parseCookies(request.headers.get('cookie'))
         const token = cookieMap[env.cookieName]
 
@@ -131,8 +115,19 @@ export const authRoutes = new Elysia({ prefix: '/api/auth' })
             return fail('401', '登录已过期')
         }
 
-        await initDatabase()
-        const userRecord = await findUserById(payload.userId)
+        const rows = env.dbDriver === 'mysql'
+            ? await (db as MySql2Database)
+                .select()
+                .from(usersMysql)
+                .where(eq(usersMysql.id, payload.userId))
+                .limit(1)
+            : await (db as PostgresJsDatabase)
+                .select()
+                .from(usersPg)
+                .where(eq(usersPg.id, payload.userId))
+                .limit(1)
+
+        const userRecord = rows[0]
         if (!userRecord) {
             set.status = 401
             return fail('401', '用户不存在')
@@ -140,7 +135,7 @@ export const authRoutes = new Elysia({ prefix: '/api/auth' })
 
         return success(toPublicUser(userRecord))
     })
-    .delete('/logout', ({ set }) => {
+    .delete('/api/auth/logout', ({ set }) => {
         set.headers['set-cookie'] = clearAuthCookie()
         return success(true)
     })

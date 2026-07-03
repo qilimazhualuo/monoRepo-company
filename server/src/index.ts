@@ -1,36 +1,23 @@
-import { Elysia } from 'elysia'
-import { cors } from '@elysiajs/cors'
 import { existsSync } from 'node:fs'
 import { env } from './config/env'
-import { initDatabase } from './db'
-import { initRsaKeys } from './services/crypto'
-import { seedDefaultAdmin } from './models/user'
-import { authRoutes } from './routes/auth'
+import { initDb } from './db'
+import { createBaseApp } from './app'
 import { createPublicStaticPlugin } from './plugins/publicStatic'
+import { registerAuthRoutes } from './routes/auth'
+import { initRsaKeys } from './services/crypto'
 
 const bootstrap = async () => {
     initRsaKeys()
-    await initDatabase()
-    await seedDefaultAdmin()
+    await initDb()
 
-    let app = new Elysia()
-        .use(
-            cors({
-                origin: env.corsOrigin,
-                credentials: true,
-                methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-                allowedHeaders: ['Content-Type', 'Authorization'],
-            }),
-        )
-        .get('/health', () => ({
-            code: '200',
-            data: 'ok',
-        }))
-        .use(authRoutes)
+    const appWithAuth = registerAuthRoutes(createBaseApp())
+
+    const app = env.publicEnabled && existsSync(env.publicDir)
+        ? appWithAuth.use(createPublicStaticPlugin(env.publicDir))
+        : appWithAuth
 
     if (env.publicEnabled) {
         if (existsSync(env.publicDir)) {
-            app = app.use(createPublicStaticPlugin(env.publicDir))
             console.log(`[server] 静态资源目录: ${env.publicDir}`)
         } else {
             console.warn(`[server] 静态资源目录不存在，已跳过: ${env.publicDir}`)

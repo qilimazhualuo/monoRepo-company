@@ -27,6 +27,23 @@ export interface DiscoverSharedPackagesOptions {
     minAppCount?: number
 }
 
+const normalizeRootPath = (rootPath: string) => rootPath.replace(/\\/g, '/')
+
+export const dedupeScanRoots = (scanRoots: string[]): string[] => {
+    return scanRoots.filter((scanRoot, index, allRoots) => (
+        existsSync(scanRoot) && allRoots.findIndex(
+            (candidateRoot) => normalizeRootPath(candidateRoot) === normalizeRootPath(scanRoot),
+        ) === index
+    ))
+}
+
+const resolveAllScanRoots = (options: DiscoverSharedPackagesOptions): string[] => (
+    dedupeScanRoots([
+        options.producerRoot,
+        ...options.consumerRoots,
+    ])
+)
+
 const readPackageJson = (appRoot: string): Record<string, unknown> | null => {
     const packageJsonPath = resolve(appRoot, 'package.json')
     if (!existsSync(packageJsonPath)) {
@@ -182,12 +199,7 @@ const filterShareablePackages = (
 }
 
 export const discoverSharedPackages = (options: DiscoverSharedPackagesOptions): string[] => {
-    const appRoots = [
-        options.producerRoot,
-        ...options.consumerRoots,
-    ].filter((appRoot, index, allRoots) => (
-        existsSync(appRoot) && allRoots.indexOf(appRoot) === index
-    ))
+    const appRoots = resolveAllScanRoots(options)
 
     const minAppCount = options.minAppCount ?? 2
     const packageAppCount = new Map<string, number>()
@@ -286,11 +298,9 @@ export const resolveSharedRules = (
 }
 
 export const formatDiscoveredPackagesLog = (
-    producerRoot: string,
-    consumerRoots: string[],
+    scanRoots: string[],
     packageNames: string[],
 ): string => {
-    const producerName = basename(producerRoot)
-    const consumerNames = consumerRoots.map((consumerRoot) => basename(consumerRoot)).join(', ')
-    return `[vite-plugin-shared-chunks] auto shared (${producerName} + ${consumerNames}): ${packageNames.join(', ')}`
+    const rootNames = scanRoots.map((scanRoot) => basename(scanRoot)).join(', ')
+    return `[vite-plugin-shared-chunks] auto shared (${rootNames}): ${packageNames.join(', ')}`
 }

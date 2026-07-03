@@ -13,6 +13,7 @@ import {
 } from './consumerSurface.ts'
 import { createRulesFromPackages, loadSharedChunksEnv } from './loadEnv.ts'
 import {
+    dedupeScanRoots,
     discoverSharedPackages,
     formatDiscoveredPackagesLog,
     resolveSharedRules,
@@ -23,10 +24,21 @@ import {
 } from './patchChunkExports.ts'
 import { rewriteSharedBarrelImports } from './rewriteImports.ts'
 import {
+    buildSharedManifest,
+    createSharedBuildId,
+    loadSharedBuildManifest,
+    resolveSharedBuildDir,
+    serializeSharedManifest,
+    SHARED_MANIFEST_FILE_NAME,
+    sharedJsUrlPattern,
+    toSharedBundleDirName,
+    toSharedBundlePrefix,
+    type SharedBuildManifest,
+} from './sharedBuildManifest.ts'
+import {
     resolveSharedChunkFileKey,
     resolveSharedChunkName,
     resolveVueVendorChunkName,
-    sharedJsUrlPattern,
     toAbsoluteSharedAssetUrl,
     toAbsoluteSharedChunkUrl,
 } from './resolveChunk.ts'
@@ -36,6 +48,7 @@ export { createRulesFromPackages, loadSharedChunksEnv } from './loadEnv.ts'
 export {
     collectAppRuntimePackages,
     createRulesFromDiscoveredPackages,
+    dedupeScanRoots,
     discoverSharedPackages,
     resolveSharedRules,
 } from './discoverSharedPackages.ts'
@@ -87,7 +100,7 @@ export interface SharedChunksPluginOptions {
      */
     consumerSharedDir?: string
     /**
-     * producer 扫描的子应用目录名（相对 apps/），默认读 .env CONSUMER_APPS 或 apps 下除自身外全部
+     * producer 扫描的应用目录名（相对 apps/），默认读 .env CONSUMER_APPS 或 apps 下除自身外全部
      */
     consumerApps?: string[]
     /** producer 扫描的子应用绝对/相对路径，优先级高于 consumerApps */
@@ -119,20 +132,76 @@ const isSharedChunkName = (chunkName?: string) => {
 
 const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
-const rewriteSharedImportPaths = (code: string, publicPath: string) => {
-    const publicPrefix = publicPath.replace(/\/$/, '')
+const rewriteSharedImportPaths = (code: string, sharedManifest: SharedBuildManifest) => {
+    const manifestBase = sharedManifest.base.replace(/\/$/, '')
+    const bundleDirPattern = escapeRegExp(sharedManifest.dir)
+    const relativeSharedPattern = new RegExp(
+        `(from|import|import\\()\\s*(['"])(?:\\.\\.\\/)+${bundleDirPattern}\\/`,
+        'g',
+    )
+    const legacyNestedPattern = new RegExp(
+        `(from|import|import\\()\\s*(['"])(?:\\.\\.\\/)+shared\\/${escapeRegExp(sharedManifest.buildId)}\\/`,
+        'g',
+    )
+
     return code
-        .replace(/from\s*(['"])(\.\.\/)+shared\//g, `from$1${publicPrefix}/`)
-        .replace(/import\s*(['"])(\.\.\/)+shared\//g, `import$1${publicPrefix}/`)
-        .replace(/import\(\s*(['"])(\.\.\/)+shared\//g, `import($1${publicPrefix}/`)
+        .replace(relativeSharedPattern, `$1$2${manifestBase}/`)
+        .replace(legacyNestedPattern, `$1$2${manifestBase}/`)
+        .replace(
+            new RegExp(`(${escapeRegExp(manifestBase)}/)${bundleDirPattern}/`, 'g'),
+            '$1',
+        )
 }
+
+const rewriteLegacyAbsoluteSharedPaths = (
+    code: string,
+    publicPath: string,
+    sharedManifest: SharedBuildManifest,
+) => {
+    const bundlePrefix = toSharedBundlePrefix(publicPath)
+    const manifestBase = sharedManifest.base.replace(/\/$/, '')
+    const legacyNestedPattern = new RegExp(
+        `/${bundlePrefix}/${sharedManifest.buildId}/`,
+        'g',
+    )
+    const legacyFlatPattern = new RegExp(
+        `/${bundlePrefix}/(?!${sharedManifest.buildId}/)([\\w./-]+\\.(?:js|css))`,
+        'g',
+    )
+
+    return code
+        .replace(legacyNestedPattern, `/${sharedManifest.dir}/`)
+        .replace(legacyFlatPattern, `${manifestBase}/$1`)
+}
+
+const isSharedBundlePath = (fileName: string, bundleDirName: string) => {
+    const normalizedFileName = fileName.replace(/\\/g, '/')
+    return normalizedFileName.startsWith(`${bundleDirName}/`)
+}
+
+const getSharedChunkOutputPath = (chunkName: string, bundleDirName: string) => {
+    const relativeChunkPath = chunkName.replace(/^shared\//, '')
+    return `${bundleDirName}/${relativeChunkPath}.js`
+}
+
+const getSharedAssetOutputPath = (assetLogicalName: string, bundleDirName: string) => {
+    const relativeAssetPath = assetLogicalName.replace(/^shared\//, '')
+    if (/\.[a-z0-9]+$/i.test(relativeAssetPath)) {
+        return `${bundleDirName}/${relativeAssetPath}`
+    }
+    return `${bundleDirName}/${relativeAssetPath}[extname]`
+}
+
+const isExternalSharedModuleId = (moduleId: string) => (
+    /^\/shared(?:-[a-f0-9]{8})?\//i.test(moduleId)
+)
 
 const stripSharedFromHtml = (html: string) => {
     return html
-        .replace(/<link[^>]*\shref="(?:\.\.\/)+shared\/[^"]+"[^>]*>\s*/gi, '')
-        .replace(/<link[^>]*\shref="\/shared\/[^"]+"[^>]*>\s*/gi, '')
-        .replace(/<script[^>]*\ssrc="(?:\.\.\/)+shared\/[^"]+"[^>]*>\s*<\/script>\s*/gi, '')
-        .replace(/<script[^>]*\ssrc="\/shared\/[^"]+"[^>]*>\s*<\/script>\s*/gi, '')
+        .replace(/<link[^>]*\shref="(?:\.\.\/)+shared[^"]*"[^>]*>\s*/gi, '')
+        .replace(/<link[^>]*\shref="\/shared[^"]*"[^>]*>\s*/gi, '')
+        .replace(/<script[^>]*\ssrc="(?:\.\.\/)+shared[^"]*"[^>]*>\s*<\/script>\s*/gi, '')
+        .replace(/<script[^>]*\ssrc="\/shared[^"]*"[^>]*>\s*<\/script>\s*/gi, '')
 }
 
 const collectSharedCssFiles = (sharedDir: string, relativeDir = ''): Set<string> => {
@@ -163,7 +232,7 @@ const collectSharedCssFiles = (sharedDir: string, relativeDir = ''): Set<string>
     return cssFiles
 }
 
-const SHARED_CSS_ES_IMPORT_PATTERN = /import\s*["'](?:\/shared\/|(?:\.\.\/)+shared\/)[^"']+\.css["']\s*;?/g
+const SHARED_CSS_ES_IMPORT_PATTERN = /import\s*["'](?:\/shared(?:-[a-f0-9]{8})?\/|(?:\.\.\/)+shared[^"']*\/)[^"']+\.css["']\s*;?/gi
 
 const stripSharedCssEsImports = (code: string): string => (
     code.replace(SHARED_CSS_ES_IMPORT_PATTERN, '')
@@ -181,10 +250,11 @@ const buildSharedCssLoaderSnippet = (cssUrls: string[]): string => {
 const collectSharedCssUrlsFromBundle = (
     bundle: Record<string, OutputAsset | OutputChunk>,
     publicPath: string,
+    sharedManifest: SharedBuildManifest,
     availableCssFiles?: Set<string>,
 ): string[] => {
     const cssUrls = new Set<string>()
-    const sharedJsPattern = sharedJsUrlPattern(publicPath)
+    const sharedJsPattern = sharedJsUrlPattern(sharedManifest.base)
 
     for (const bundleItem of Object.values(bundle)) {
         if (bundleItem.type !== 'chunk') {
@@ -201,7 +271,7 @@ const collectSharedCssUrlsFromBundle = (
             }
 
             const cssRelativePath = sharedCssUrl
-                .replace(publicPath, '')
+                .replace(sharedManifest.base, '')
                 .replace(/^\//, '')
             if (availableCssFiles.has(cssRelativePath)) {
                 cssUrls.add(sharedCssUrl)
@@ -214,11 +284,15 @@ const collectSharedCssUrlsFromBundle = (
         }
 
         for (const cssPathMatch of mapDepsMatch[1].matchAll(/"([^"]+\.css)"/g)) {
-            const cssPath = cssPathMatch[1]
-            if (!cssPath.includes('shared/')) {
+            const cssPath = cssPathMatch[1].replace(/\\/g, '/')
+            if (!cssPath.includes('shared')) {
                 continue
             }
-            cssUrls.add(toAbsoluteSharedAssetUrl(cssPath.replace(/^\.\.\//, ''), publicPath))
+            cssUrls.add(toAbsoluteSharedAssetUrl(
+                cssPath.replace(/^\.\.\//, ''),
+                publicPath,
+                sharedManifest,
+            ))
         }
     }
 
@@ -227,6 +301,7 @@ const collectSharedCssUrlsFromBundle = (
 
 const collectSharedCssAssetsFromBundle = (
     bundle: Record<string, OutputAsset | OutputChunk>,
+    bundleDirName: string,
 ): Set<string> => {
     const cssFiles = new Set<string>()
 
@@ -236,8 +311,8 @@ const collectSharedCssAssetsFromBundle = (
         }
 
         const assetFileName = bundleItem.fileName.replace(/\\/g, '/')
-        if (assetFileName.startsWith('shared/') && assetFileName.endsWith('.css')) {
-            cssFiles.add(assetFileName)
+        if (isSharedBundlePath(assetFileName, bundleDirName) && assetFileName.endsWith('.css')) {
+            cssFiles.add(assetFileName.replace(`${bundleDirName}/`, ''))
         }
     }
 
@@ -247,9 +322,15 @@ const collectSharedCssAssetsFromBundle = (
 const injectSharedCssViaLinkLoader = (
     bundle: Record<string, OutputAsset | OutputChunk>,
     publicPath: string,
+    sharedManifest: SharedBuildManifest,
     availableCssFiles?: Set<string>,
 ) => {
-    const sharedCssUrls = collectSharedCssUrlsFromBundle(bundle, publicPath, availableCssFiles)
+    const sharedCssUrls = collectSharedCssUrlsFromBundle(
+        bundle,
+        publicPath,
+        sharedManifest,
+        availableCssFiles,
+    )
 
     for (const bundleItem of Object.values(bundle)) {
         if (bundleItem.type !== 'chunk') {
@@ -286,8 +367,19 @@ const injectConsumerSharedCss = (
         return
     }
 
-    const availableCssFiles = collectSharedCssFiles(consumerSharedDir)
-    injectSharedCssViaLinkLoader(bundle, publicPath, availableCssFiles)
+    const sharedManifest = loadSharedBuildManifest(consumerSharedDir, publicPath)
+    if (!sharedManifest) {
+        return
+    }
+
+    const sharedBuildDir = resolveSharedBuildDir(consumerSharedDir, publicPath, sharedManifest)
+    const availableCssFiles = collectSharedCssFiles(sharedBuildDir)
+    injectSharedCssViaLinkLoader(
+        bundle,
+        publicPath,
+        sharedManifest,
+        availableCssFiles,
+    )
 }
 
 /**
@@ -300,7 +392,7 @@ export const sharedChunks = (options: SharedChunksPluginOptions = {}): Plugin | 
     const envConfig = loadSharedChunksEnv(options.envFile)
     const publicPath = normalizePublicPath(options.publicPath ?? envConfig.publicPath)
     const consumerSharedDir = options.consumerSharedDir
-        ?? resolve(process.cwd(), '../main/dist/shared')
+        ?? resolve(process.cwd(), '../main/dist')
     const autoDiscover = options.autoDiscover ?? true
     const extraPackages = [
         ...(options.packages ?? []),
@@ -311,9 +403,30 @@ export const sharedChunks = (options: SharedChunksPluginOptions = {}): Plugin | 
 
     let activeRules: SharedChunkRule[] = DEFAULT_SHARED_CHUNK_RULES
     let discoverLogPrinted = false
+    let sharedBuildId = ''
+    let activeSharedManifest: SharedBuildManifest | null = null
+
+    const resolveConsumerSharedManifest = (): SharedBuildManifest | null => {
+        if (role === 'producer') {
+            if (!sharedBuildId) {
+                return null
+            }
+            return buildSharedManifest(sharedBuildId, publicPath)
+        }
+
+        return loadSharedBuildManifest(consumerSharedDir, publicPath) ?? activeSharedManifest
+    }
+
+    const getSharedBundleDirName = () => (
+        sharedBuildId ? toSharedBundleDirName(publicPath, sharedBuildId) : ''
+    )
 
     const refreshActiveRules = (projectRoot: string) => {
-        const consumerRoots = role === 'consumer'
+        const producerRoot = role === 'consumer'
+            ? resolve(projectRoot, '../main')
+            : projectRoot
+
+        const appScanRoots = role === 'consumer'
             ? [projectRoot]
             : resolveConsumerRoots(
                 projectRoot,
@@ -324,20 +437,25 @@ export const sharedChunks = (options: SharedChunksPluginOptions = {}): Plugin | 
                 envConfig.consumerApps,
             )
 
-        const producerRoot = role === 'consumer'
-            ? resolve(projectRoot, '../main')
-            : projectRoot
+        const scanRoots = dedupeScanRoots([
+            producerRoot,
+            ...appScanRoots,
+        ])
+
+        const distScanRoots = appScanRoots.filter((appRoot) => (
+            appRoot.replace(/\\/g, '/') !== producerRoot.replace(/\\/g, '/')
+        ))
 
         if (!autoDiscover) {
             activeRules = options.rules
                 ?? (extraPackages.length > 0 ? createRulesFromPackages(extraPackages) : null)
                 ?? DEFAULT_SHARED_CHUNK_RULES
-            return consumerRoots
+            return { scanRoots, distScanRoots }
         }
 
         activeRules = resolveSharedRules({
             producerRoot,
-            consumerRoots,
+            consumerRoots: appScanRoots,
             explicitRules: options.rules,
             explicitPackages: extraPackages,
             excludePackages: options.excludePackages,
@@ -347,38 +465,38 @@ export const sharedChunks = (options: SharedChunksPluginOptions = {}): Plugin | 
         if (!options.rules && !discoverLogPrinted) {
             const discoveredPackages = discoverSharedPackages({
                 producerRoot,
-                consumerRoots,
+                consumerRoots: appScanRoots,
                 extraPackages,
                 excludePackages: options.excludePackages,
                 minAppCount: options.minAppCount,
             })
-            console.log(formatDiscoveredPackagesLog(producerRoot, consumerRoots, discoveredPackages))
+            console.log(formatDiscoveredPackagesLog(scanRoots, discoveredPackages))
             discoverLogPrinted = true
         }
 
-        return consumerRoots
+        return { scanRoots, distScanRoots }
     }
 
     let consumerSurfaceModuleCode = ''
-    let resolvedConsumerRoots: string[] = []
+    let resolvedScanRoots: string[] = []
+    let resolvedDistScanRoots: string[] = []
     let producerProjectRoot = process.cwd()
 
     const sharedOutputOptions = {
         minifyInternalExports: false,
         chunkFileNames(chunkInfo: { name?: string }) {
-            if (isSharedChunkName(chunkInfo.name)) {
-                return `${chunkInfo.name}.js`
+            const bundleDirName = getSharedBundleDirName()
+            if (isSharedChunkName(chunkInfo.name) && bundleDirName) {
+                return getSharedChunkOutputPath(chunkInfo.name!, bundleDirName)
             }
             return 'assets/[name]-[hash].js'
         },
         assetFileNames(assetInfo: { names?: string[] }) {
             const assetNames = assetInfo.names ?? []
             const sharedAssetName = assetNames.find((name) => name.startsWith('shared/'))
-            if (sharedAssetName) {
-                if (/\.[a-z0-9]+$/i.test(sharedAssetName)) {
-                    return sharedAssetName
-                }
-                return `${sharedAssetName}[extname]`
+            const bundleDirName = getSharedBundleDirName()
+            if (sharedAssetName && bundleDirName) {
+                return getSharedAssetOutputPath(sharedAssetName, bundleDirName)
             }
             return 'assets/[name]-[hash][extname]'
         },
@@ -418,8 +536,14 @@ export const sharedChunks = (options: SharedChunksPluginOptions = {}): Plugin | 
         config(userConfig): UserConfig {
             const projectRoot = userConfig.root ?? process.cwd()
             producerProjectRoot = projectRoot
-            resolvedConsumerRoots = refreshActiveRules(projectRoot)
-            consumerSurfaceModuleCode = generateConsumerSurfaceModule(activeRules, resolvedConsumerRoots)
+            const { scanRoots, distScanRoots } = refreshActiveRules(projectRoot)
+            resolvedScanRoots = scanRoots
+            resolvedDistScanRoots = distScanRoots
+            consumerSurfaceModuleCode = generateConsumerSurfaceModule(
+                activeRules,
+                resolvedScanRoots,
+                resolvedDistScanRoots,
+            )
             return {}
         },
         resolveId(source) {
@@ -445,46 +569,64 @@ export const sharedChunks = (options: SharedChunksPluginOptions = {}): Plugin | 
         },
     }
 
-    const createConsumerBuildOutputConfig = (): UserConfig['build'] => ({
-        modulePreload: false,
-        rollupOptions: {
-            external: (moduleId) => {
-                if (moduleId.startsWith('/shared/')) {
-                    return true
-                }
-                return resolveSharedChunkFileKey(moduleId, activeRules) !== null
-            },
-            output: {
-                ...sharedOutputOptions,
-                paths: (moduleId) => {
-                    if (moduleId.startsWith('/shared/')) {
-                        return moduleId
+    const createConsumerBuildOutputConfig = (): UserConfig['build'] => {
+        const sharedManifest = resolveConsumerSharedManifest()
+
+        return {
+            modulePreload: false,
+            rollupOptions: {
+                external: (moduleId) => {
+                    if (isExternalSharedModuleId(moduleId)) {
+                        return true
                     }
-                    const chunkFileKey = resolveSharedChunkFileKey(moduleId, activeRules)
-                    if (!chunkFileKey) {
-                        return moduleId
-                    }
-                    return toAbsoluteSharedChunkUrl(chunkFileKey, publicPath)
+                    return resolveSharedChunkFileKey(moduleId, activeRules) !== null
+                },
+                output: {
+                    ...sharedOutputOptions,
+                    paths: (moduleId) => {
+                        if (isExternalSharedModuleId(moduleId)) {
+                            return moduleId
+                        }
+                        const chunkFileKey = resolveSharedChunkFileKey(moduleId, activeRules)
+                        if (!chunkFileKey) {
+                            return moduleId
+                        }
+                        return toAbsoluteSharedChunkUrl(chunkFileKey, publicPath, sharedManifest)
+                    },
                 },
             },
-        },
-    })
+        }
+    }
 
     const sharedChunksPlugin: Plugin = {
         name: 'vite-plugin-shared-chunks',
         apply: 'build',
         enforce: 'post',
+        buildStart() {
+            if (role === 'producer') {
+                sharedBuildId = createSharedBuildId()
+                activeSharedManifest = buildSharedManifest(sharedBuildId, publicPath)
+            }
+        },
         config(userConfig): UserConfig {
             const projectRoot = userConfig.root ?? process.cwd()
 
             if (role === 'consumer') {
-                refreshActiveRules(projectRoot)
+                const { scanRoots } = refreshActiveRules(projectRoot)
+                resolvedScanRoots = scanRoots
+                activeSharedManifest = resolveConsumerSharedManifest()
                 return { build: createConsumerBuildOutputConfig() }
             }
 
             producerProjectRoot = projectRoot
-            resolvedConsumerRoots = refreshActiveRules(projectRoot)
-            consumerSurfaceModuleCode = generateConsumerSurfaceModule(activeRules, resolvedConsumerRoots)
+            const { scanRoots, distScanRoots } = refreshActiveRules(projectRoot)
+            resolvedScanRoots = scanRoots
+            resolvedDistScanRoots = distScanRoots
+            consumerSurfaceModuleCode = generateConsumerSurfaceModule(
+                activeRules,
+                resolvedScanRoots,
+                resolvedDistScanRoots,
+            )
 
             return {
                 build: producerRollupInput(projectRoot),
@@ -497,7 +639,11 @@ export const sharedChunks = (options: SharedChunksPluginOptions = {}): Plugin | 
             if (role !== 'consumer' || id.includes('node_modules')) {
                 return null
             }
-            const rewrittenCode = rewriteSharedBarrelImports(code, publicPath)
+            const rewrittenCode = rewriteSharedBarrelImports(
+                code,
+                publicPath,
+                resolveConsumerSharedManifest(),
+            )
             if (rewrittenCode === code) {
                 return null
             }
@@ -509,37 +655,49 @@ export const sharedChunks = (options: SharedChunksPluginOptions = {}): Plugin | 
                 return
             }
 
+            if (!sharedBuildId) {
+                return
+            }
+
+            const sharedManifest = buildSharedManifest(sharedBuildId, publicPath)
+            activeSharedManifest = sharedManifest
+
             for (const bundleItem of Object.values(bundle)) {
                 if (bundleItem.type === 'chunk') {
                     const outputChunk = bundleItem as OutputChunk
-                    outputChunk.code = rewriteSharedImportPaths(outputChunk.code, publicPath)
+                    outputChunk.code = rewriteSharedImportPaths(outputChunk.code, sharedManifest)
+                    outputChunk.code = rewriteLegacyAbsoluteSharedPaths(
+                        outputChunk.code,
+                        publicPath,
+                        sharedManifest,
+                    )
                 }
             }
 
-            const distSharedImports = scanConsumerDistSharedImports(resolvedConsumerRoots)
+            const distSharedImports = scanConsumerDistSharedImports(resolvedDistScanRoots)
             for (const bundleItem of Object.values(bundle)) {
                 if (bundleItem.type !== 'chunk') {
                     continue
                 }
 
                 const outputChunk = bundleItem as OutputChunk
-                const chunkFileName = outputChunk.fileName.replace(/\\/g, '/')
-
-                if (chunkFileName === 'shared/vue.js') {
-                    const requiredVueExports = collectRequiredExportsForChunk(
-                        'shared/vue',
-                        distSharedImports,
-                        DEFAULT_VUE_COMPILER_EXPORTS,
-                    )
-                    outputChunk.code = patchSharedChunkExportAliases(
-                        outputChunk.code,
-                        requiredVueExports,
-                    )
+                if (outputChunk.name !== 'shared/vue') {
+                    continue
                 }
+
+                const requiredVueExports = collectRequiredExportsForChunk(
+                    'shared/vue',
+                    distSharedImports,
+                    DEFAULT_VUE_COMPILER_EXPORTS,
+                )
+                outputChunk.code = patchSharedChunkExportAliases(
+                    outputChunk.code,
+                    requiredVueExports,
+                )
             }
 
             for (const bundleItem of Object.values(bundle)) {
-                if (bundleItem.type !== 'chunk') {
+                if (bundleItem.type !== 'asset') {
                     continue
                 }
 
@@ -549,11 +707,15 @@ export const sharedChunks = (options: SharedChunksPluginOptions = {}): Plugin | 
                 }
 
                 const assetFileName = outputAsset.fileName.replace(/\\/g, '/')
-                if (!assetFileName.startsWith('shared/')) {
+                if (!isSharedBundlePath(assetFileName, sharedManifest.dir)) {
                     continue
                 }
 
-                const absoluteAssetPath = toAbsoluteSharedAssetUrl(assetFileName, publicPath)
+                const absoluteAssetPath = toAbsoluteSharedAssetUrl(
+                    assetFileName,
+                    publicPath,
+                    sharedManifest,
+                )
                 for (const bundleChunk of Object.values(bundle)) {
                     if (bundleChunk.type !== 'chunk') {
                         continue
@@ -573,10 +735,17 @@ export const sharedChunks = (options: SharedChunksPluginOptions = {}): Plugin | 
                 }
             }
 
+            this.emitFile({
+                type: 'asset',
+                fileName: SHARED_MANIFEST_FILE_NAME,
+                source: serializeSharedManifest(sharedManifest),
+            })
+
             injectSharedCssViaLinkLoader(
                 bundle,
                 publicPath,
-                collectSharedCssAssetsFromBundle(bundle),
+                sharedManifest,
+                collectSharedCssAssetsFromBundle(bundle, sharedManifest.dir),
             )
         },
     }
