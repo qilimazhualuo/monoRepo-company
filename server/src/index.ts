@@ -5,9 +5,12 @@ import { createBaseApp } from './app'
 import { createPublicStaticPlugin } from './plugins/publicStatic'
 import { registerAuthRoutes } from './routes/auth'
 import { initRsaKeys } from './services/crypto'
+import { connectRedis, initRedis } from './services/session'
 
 const bootstrap = async () => {
     initRsaKeys()
+    initRedis()
+    await connectRedis()
     await initDb()
 
     const appWithAuth = registerAuthRoutes(createBaseApp())
@@ -28,6 +31,10 @@ const bootstrap = async () => {
     app.listen(env.port)
 
     console.log(`[server] Elysia 已启动: http://localhost:${app.server?.port}`)
+    console.log(`[server] 数据库: ${env.dbDriver}://${env.dbHost}:${env.dbPort}/${env.dbName}`)
+    if (env.publicEnabled) {
+        console.log(`[server] 静态资源: 已开启`)
+    }
 }
 
 bootstrap().catch((error) => {
@@ -35,8 +42,9 @@ bootstrap().catch((error) => {
 
     if (String(error).includes('password authentication failed') || String(error).includes('ECONNREFUSED')) {
         console.error('')
-        console.error('[server] 数据库连接失败，请检查 server/.env 中的 DB_* 配置')
-        console.error('[server] 参考 server/.env.example，确保 PostgreSQL/MySQL 已启动且账号密码正确')
+        console.error('[server] 数据库或 Redis 连接失败，请检查 server/.env 中的 DB_* / REDIS_* 配置')
+        console.error('[server] 可先执行 yarn docker:up 启动 PostgreSQL / MySQL / Redis')
+        console.error('[server] 参考 server/.env.example，确保服务已启动且账号密码正确')
     }
 
     process.exit(1)

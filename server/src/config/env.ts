@@ -18,7 +18,11 @@ export interface EnvConfig {
     jwtSecret: string
     cookieName: string
     cookieMaxAge: number
-    corsOrigin: string
+    redisHost: string
+    redisPort: number
+    redisPassword: string
+    redisDb: number
+    sessionPrefix: string
     defaultAdminUsername: string
     defaultAdminPassword: string
     rsaPublicKey: string
@@ -87,7 +91,11 @@ export const env: EnvConfig = {
     jwtSecret: readEnv('JWT_SECRET', 'mono-repo-dev-secret'),
     cookieName: readEnv('COOKIE_NAME', 'mono_token'),
     cookieMaxAge: Number(readEnv('COOKIE_MAX_AGE', '604800')),
-    corsOrigin: readEnv('CORS_ORIGIN', 'http://localhost:8080'),
+    redisHost: readEnv('REDIS_HOST', '127.0.0.1'),
+    redisPort: Number(readEnv('REDIS_PORT', '6379')),
+    redisPassword: readEnv('REDIS_PASSWORD'),
+    redisDb: Number(readEnv('REDIS_DB', '0')),
+    sessionPrefix: readEnv('SESSION_PREFIX', 'mono:session:'),
     defaultAdminUsername: readEnv('DEFAULT_ADMIN_USERNAME', 'admin'),
     defaultAdminPassword: readEnv('DEFAULT_ADMIN_PASSWORD', 'admin123'),
     rsaPublicKey: readEnv('RSA_PUBLIC_KEY'),

@@ -18,7 +18,10 @@
         "build:sub": "yarn workspace sub-app build",
         "analyze": "yarn analyze:main && yarn analyze:sub",
         "analyze:main": "yarn workspace main build --mode analyze",
-        "analyze:sub": "yarn workspace sub-app build --mode analyze"
+        "analyze:sub": "yarn workspace sub-app build --mode analyze",
+        "docker:up": "docker compose -f docker/docker-compose.yml up -d",
+        "docker:down": "docker compose -f docker/docker-compose.yml down",
+        "docker:logs": "docker compose -f docker/docker-compose.yml logs -f"
     },
     "devDependencies": {
         "concurrently": "^9.1.2",

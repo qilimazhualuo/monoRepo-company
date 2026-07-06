@@ -9,6 +9,7 @@ import { usersMysql, usersPg } from '../models/user'
 import { createSliderCaptcha, verifySliderCaptcha } from '../services/captcha'
 import { decryptRsaPassword, getPublicKeyPem } from '../services/crypto'
 import { createAccessToken, verifyAccessToken } from '../services/token'
+import { createSession, getSession, revokeSession } from '../services/session'
 import { buildAuthCookie, clearAuthCookie, parseCookies, toPublicUser } from '../utils/auth'
 
 const success = <T>(data: T) => ({
@@ -83,6 +84,10 @@ export const registerAuthRoutes = <T extends BaseApp>(app: T) => app
             }
 
             const accessToken = createAccessToken(userRecord.id, userRecord.username)
+            await createSession(accessToken, {
+                userId: userRecord.id,
+                username: userRecord.username,
+            })
             set.headers['set-cookie'] = buildAuthCookie(accessToken)
 
             return success(toPublicUser(userRecord))
@@ -115,6 +120,12 @@ export const registerAuthRoutes = <T extends BaseApp>(app: T) => app
             return fail('401', '登录已过期')
         }
 
+        const session = await getSession(token)
+        if (!session || session.userId !== payload.userId) {
+            set.status = 401
+            return fail('401', '登录已过期')
+        }
+
         const rows = env.dbDriver === 'mysql'
             ? await (db as MySql2Database)
                 .select()
@@ -135,7 +146,14 @@ export const registerAuthRoutes = <T extends BaseApp>(app: T) => app
 
         return success(toPublicUser(userRecord))
     })
-    .delete('/api/auth/logout', ({ set }) => {
+    .delete('/api/auth/logout', async ({ request, set }) => {
+        const cookieMap = parseCookies(request.headers.get('cookie'))
+        const token = cookieMap[env.cookieName]
+
+        if (token) {
+            await revokeSession(token)
+        }
+
         set.headers['set-cookie'] = clearAuthCookie()
         return success(true)
     })

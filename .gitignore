@@ -3,7 +3,7 @@ dist
 apps/*/stats.html
 .DS_Store
 *.local
-.env
+# .env
 !.env.example
 plugins/vite-plugin-shared-chunks/.env
 plugins/vite-plugin-app-base/.env
