@@ -22,6 +22,12 @@ const router = createRouter({
             component: () => import('@/views/SubApp.vue'),
             meta: { title: '子应用', requiresAuth: true },
         },
+        {
+            path: '/basic-app/:pathMatch(.*)*',
+            name: 'basic-app',
+            component: () => import('@/views/BasicApp.vue'),
+            meta: { title: '基础管理', requiresAuth: true },
+        },
     ],
 })
 

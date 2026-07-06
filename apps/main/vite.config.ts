@@ -45,14 +45,14 @@ export default defineConfig(({ mode }) => ({
         include: ['wc-ui', 'wc-utils', 'vite-plugin-app-base', 'vite-plugin-shared-chunks'],
     },
     server: {
-        port: 8080,
+        port: 3000,
         host: true,
         fs: {
             allow: [resolve(__dirname, '../..')],
         },
         proxy: {
             '/api': {
-                target: 'http://localhost:9001',
+                target: 'http://localhost:9000',
                 changeOrigin: true,
             },
         },

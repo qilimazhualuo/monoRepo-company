@@ -13,6 +13,7 @@ const isLoginPage = computed(() => route.path === '/login')
 const navList = [
     { path: '/', label: '首页' },
     { path: '/sub-app', label: '子应用' },
+    { path: '/basic-app', label: '基础管理' },
 ]
 
 const currentPath = computed(() => route.path)

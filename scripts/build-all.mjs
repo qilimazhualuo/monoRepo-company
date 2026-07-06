@@ -7,7 +7,7 @@ const monorepoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 
 /** 与 merge-dist.mjs 一致：基座必须先于子应用（子应用 consumer 依赖 apps/main/dist/shared） */
 const hostAppName = 'main'
-const microAppNames = ['sub-app']
+const microAppNames = ['sub-app', 'basic-app']
 
 /** 仅编译需要产物的应用（apps/*），server / plugins / packages 均不参与 */
 const buildableWorkspacePatterns = ['apps/*']

@@ -5,20 +5,28 @@
         "apps/*",
         "packages/*",
         "plugins/*",
-        "server"
+        "server/auth",
+        "server/basic",
+        "server/gateway"
     ],
     "scripts": {
-        "dev": "concurrently -n server,main,sub -c magenta,blue,green \"yarn dev:server\" \"yarn dev:main\" \"yarn dev:sub\"",
-        "dev:server": "yarn workspace server dev",
+        "dev": "node scripts/dev.mjs",
+        "dev:gateway": "yarn workspace gateway dev",
+        "dev:server": "yarn workspace auth dev",
+        "dev:basic": "yarn workspace basic dev",
         "dev:main": "yarn workspace main dev",
         "dev:sub": "yarn workspace sub-app dev",
+        "dev:basic-app": "yarn workspace basic-app dev",
         "build": "yarn build:all && node scripts/merge-dist.mjs",
         "build:all": "node scripts/build-all.mjs",
         "build:main": "yarn workspace main build",
         "build:sub": "yarn workspace sub-app build",
+        "build:basic-app": "yarn workspace basic-app build",
         "analyze": "yarn analyze:main && yarn analyze:sub",
         "analyze:main": "yarn workspace main build --mode analyze",
-        "analyze:sub": "yarn workspace sub-app build --mode analyze"
+        "docker:up": "docker compose -p mono-repo -f docker/docker-compose.yml up -d",
+        "docker:down": "docker compose -p mono-repo -f docker/docker-compose.yml down",
+        "docker:logs": "docker compose -p mono-repo -f docker/docker-compose.yml logs -f"
     },
     "devDependencies": {
         "concurrently": "^9.1.2",

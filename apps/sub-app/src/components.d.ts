@@ -10,7 +10,12 @@ declare module 'vue' {
   export interface GlobalComponents {
     AAlert: typeof import('antdv-next')['Alert']
     AButton: typeof import('antdv-next')['Button']
+    AForm: typeof import('antdv-next')['Form']
+    AFormItem: typeof import('antdv-next')['FormItem']
+    AInput: typeof import('antdv-next')['Input']
+    AInputPassword: typeof import('antdv-next')['InputPassword']
     ASpace: typeof import('antdv-next')['Space']
+    ASpin: typeof import('antdv-next')['Spin']
     ATag: typeof import('antdv-next')['Tag']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']

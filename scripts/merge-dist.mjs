@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url'
 const monorepoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const deployDistDir = resolve(monorepoRoot, 'dist')
 const hostAppName = 'main'
-const microAppNames = ['sub-app']
+const microAppNames = ['sub-app', 'basic-app']
 const sharedBundlePattern = /^shared-[a-f0-9]{8}$/i
 
 const copyEntry = (sourcePath, targetPath) => {

@@ -1,0 +1,21 @@
+{
+    "name": "gateway",
+    "private": true,
+    "version": "0.0.1",
+    "type": "module",
+    "scripts": {
+        "dev": "bun --watch src/index.ts",
+        "start": "bun src/index.ts"
+    },
+    "dependencies": {
+        "@elysiajs/cors": "^1.2.0",
+        "auth-kit": "file:../../packages/auth-kit",
+        "elysia": "^1.2.25",
+        "nacos-kit": "file:../../packages/nacos-kit"
+    },
+    "devDependencies": {
+        "@types/bun": "^1.2.5",
+        "@types/node": "^22.13.4",
+        "typescript": "~5.7.2"
+    }
+}
