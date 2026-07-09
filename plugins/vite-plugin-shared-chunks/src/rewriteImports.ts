@@ -72,6 +72,10 @@ export const rewriteSharedBarrelImports = (
         resolveChunkUrl(resolveAntdvConsumerChunkKey(exportName))
     ))
 
+    rewrittenCode = rewriteBarrelImports(rewrittenCode, 'wc-page', () => (
+        resolveChunkUrl('shared/wc-page')
+    ))
+
     rewrittenCode = rewriteBarrelImports(rewrittenCode, 'wc-ui', () => (
         resolveChunkUrl('shared/wc-ui')
     ))

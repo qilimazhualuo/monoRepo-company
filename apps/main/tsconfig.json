@@ -21,7 +21,11 @@
             "wc-ui": ["../../packages/wc-ui/src"],
             "wc-ui/*": ["../../packages/wc-ui/src/*"],
             "wc-utils": ["../../packages/wc-utils/src"],
-            "wc-utils/*": ["../../packages/wc-utils/src/*"]
+            "wc-utils/*": ["../../packages/wc-utils/src/*"],
+            "wc-basic": ["../../packages/wc-basic/src"],
+            "wc-basic/*": ["../../packages/wc-basic/src/*"],
+            "wc-page": ["../../packages/wc-page/src"],
+            "wc-page/*": ["../../packages/wc-page/src/*"]
         }
     },
     "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.vue", "src/components.d.ts"]

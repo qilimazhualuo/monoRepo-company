@@ -31,4 +31,8 @@ export const toPublicUser = (user: UserRecord) => ({
     id: user.id,
     username: user.username,
     nickname: user.nickname,
+    orgId: user.orgId,
+    phone: user.phone,
+    email: user.email,
+    status: user.status,
 })

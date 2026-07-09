@@ -6,10 +6,14 @@ export interface ApiResponse<T = unknown> {
 
 export interface HttpClientOptions {
     baseUrl?: string
+    successCode?: string
+    noErrCode?: boolean
 }
 
 export const createHttpClient = (options: HttpClientOptions = {}) => {
     const baseUrl = options.baseUrl ?? '/api'
+    const successCode = options.successCode ?? '200'
+    const noErrCode = options.noErrCode ?? false
 
     const request = async <T>(
         path: string,
@@ -36,7 +40,7 @@ export const createHttpClient = (options: HttpClientOptions = {}) => {
             }
         }
 
-        if (result.code !== '200') {
+        if (!noErrCode && result.code !== successCode) {
             throw result
         }
 
@@ -48,6 +52,11 @@ export const createHttpClient = (options: HttpClientOptions = {}) => {
         post: <T>(path: string, body?: unknown) =>
             request<T>(path, {
                 method: 'POST',
+                body: body !== undefined ? JSON.stringify(body) : undefined,
+            }),
+        put: <T>(path: string, body?: unknown) =>
+            request<T>(path, {
+                method: 'PUT',
                 body: body !== undefined ? JSON.stringify(body) : undefined,
             }),
         delete: <T>(path: string) => request<T>(path, { method: 'DELETE' }),

@@ -1,16 +1,16 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { AppLogo, PageHeader, useAppStore } from 'wc-ui'
+import { AppLogo, PageHeader } from 'wc-ui'
 import { formatDate } from 'wc-utils'
 
-const appStore = useAppStore()
+const appTitle = 'MonoRepo 微前端'
 const currentTime = computed(() => formatDate(new Date()))
 </script>
 
 <template>
     <div class="home">
         <PageHeader
-            :title="appStore.appTitle"
+            :title="appTitle"
             subtitle="主应用基座 · 共享 packages 已接入"
         >
             <template #extra>
@@ -25,7 +25,7 @@ const currentTime = computed(() => formatDate(new Date()))
 
             <a-descriptions bordered :column="1" size="small">
                 <a-descriptions-item label="组件库">antdv-next</a-descriptions-item>
-                <a-descriptions-item label="状态管理">Pinia（wc-ui）</a-descriptions-item>
+                <a-descriptions-item label="状态管理">Pinia（主应用）</a-descriptions-item>
                 <a-descriptions-item label="工具方法">wc-utils</a-descriptions-item>
                 <a-descriptions-item label="当前时间">{{ currentTime }}</a-descriptions-item>
             </a-descriptions>

@@ -11,7 +11,8 @@ const SKIP_DIR_NAMES = new Set(['node_modules', 'dist', '.git'])
 
 /** 仅基座使用的包，不参与跨应用共享 */
 const NEVER_SHARED_PACKAGES = new Set([
-    '@micro-zoe/micro-app',
+    'wujie',
+    'wujie-vue3',
     'vite-plugin-app-base',
     'vite-plugin-shared-chunks',
 ])

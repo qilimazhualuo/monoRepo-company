@@ -8,14 +8,12 @@ const defaultPublicDir = resolve(serverRootDir, '../dist')
 export interface EnvConfig {
     port: number
     publicDir: string
-    publicEnabled: boolean
     dbDriver: 'pg' | 'mysql'
     dbHost: string
     dbPort: number
     dbUser: string
     dbPassword: string
     dbName: string
-    jwtSecret: string
     cookieName: string
     cookieMaxAge: number
     redisHost: string
@@ -81,14 +79,12 @@ loadEnvFile()
 export const env: EnvConfig = {
     port: Number(readEnv('PORT', '9001')),
     publicDir: readEnv('PUBLIC_DIR', defaultPublicDir),
-    publicEnabled: readEnv('PUBLIC_ENABLED', 'true') !== 'false',
     dbDriver: (readEnv('DB_DRIVER', 'pg') as 'pg' | 'mysql'),
     dbHost: readEnv('DB_HOST', '127.0.0.1'),
     dbPort: Number(readEnv('DB_PORT', readEnv('DB_DRIVER', 'pg') === 'mysql' ? '3306' : '5432')),
     dbUser: readEnv('DB_USER', 'postgres'),
     dbPassword: readEnv('DB_PASSWORD', 'postgres'),
     dbName: readEnv('DB_NAME', 'mono_repo'),
-    jwtSecret: readEnv('JWT_SECRET', 'mono-repo-dev-secret'),
     cookieName: readEnv('COOKIE_NAME', 'mono_token'),
     cookieMaxAge: Number(readEnv('COOKIE_MAX_AGE', '604800')),
     redisHost: readEnv('REDIS_HOST', '127.0.0.1'),

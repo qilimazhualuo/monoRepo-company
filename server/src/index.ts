@@ -1,9 +1,12 @@
-import { existsSync } from 'node:fs'
+import { Elysia } from 'elysia'
 import { env } from './config/env'
 import { initDb } from './db'
-import { createBaseApp } from './app'
-import { createPublicStaticPlugin } from './plugins/publicStatic'
-import { registerAuthRoutes } from './routes/auth'
+import { corsPlugin } from './plugins/cors'
+import { publicStaticPlugin } from './plugins/publicStatic'
+import { seedPlugin } from './plugins/seed'
+import { setup } from './plugins/setup'
+import { authRoutes } from './routes/auth'
+import { systemRoutes } from './routes/system'
 import { initRsaKeys } from './services/crypto'
 import { connectRedis, initRedis } from './services/session'
 
@@ -13,28 +16,23 @@ const bootstrap = async () => {
     await connectRedis()
     await initDb()
 
-    const appWithAuth = registerAuthRoutes(createBaseApp())
-
-    const app = env.publicEnabled && existsSync(env.publicDir)
-        ? appWithAuth.use(createPublicStaticPlugin(env.publicDir))
-        : appWithAuth
-
-    if (env.publicEnabled) {
-        if (existsSync(env.publicDir)) {
-            console.log(`[server] 静态资源目录: ${env.publicDir}`)
-        } else {
-            console.warn(`[server] 静态资源目录不存在，已跳过: ${env.publicDir}`)
-            console.warn('[server] 请先执行 yarn build 生成 dist，或配置 PUBLIC_DIR')
-        }
-    }
+    const app = new Elysia()
+        .use(corsPlugin)
+        .use(setup)
+        .use(seedPlugin)
+        .get('/health', () => ({
+            code: '200',
+            data: 'ok',
+        }))
+        .use(authRoutes)
+        .use(systemRoutes)
+        .use(publicStaticPlugin)
 
     app.listen(env.port)
 
     console.log(`[server] Elysia 已启动: http://localhost:${app.server?.port}`)
     console.log(`[server] 数据库: ${env.dbDriver}://${env.dbHost}:${env.dbPort}/${env.dbName}`)
-    if (env.publicEnabled) {
-        console.log(`[server] 静态资源: 已开启`)
-    }
+    console.log(`[server] 静态资源目录: ${env.publicDir}`)
 }
 
 bootstrap().catch((error) => {

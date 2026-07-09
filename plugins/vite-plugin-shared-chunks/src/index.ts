@@ -384,7 +384,7 @@ const injectConsumerSharedCss = (
 
 /**
  * 生产构建：将依赖拆到固定文件名的 shared chunk，并通过绝对 URL 引用，
- * 便于 micro-app 跨应用复用（需同域部署 /shared/）。
+ * 便于 wujie 跨应用复用（需同域部署 /shared/）。
  * antdv / wc-ui / wc-utils 按组件或子路径拆分，各应用只加载引用到的 chunk。
  */
 export const sharedChunks = (options: SharedChunksPluginOptions = {}): Plugin | Plugin[] => {

@@ -1,0 +1,12 @@
+{
+    "extends": "./tsconfig.json",
+    "compilerOptions": {
+        "paths": {
+            "@/*": ["./src/*"],
+            "wc-ui": ["../../packages/wc-ui/dist/index.d.ts"],
+            "wc-utils": ["../../packages/wc-utils/dist/index.d.ts"],
+            "wc-basic": ["../../packages/wc-basic/dist/index.d.ts"],
+            "wc-page": ["../../packages/wc-page/dist/index.d.ts"]
+        }
+    }
+}

@@ -5,7 +5,7 @@
     <div class="about">
         <h3 class="about__title">关于子应用</h3>
         <p class="about__desc">
-            子应用已配置 micro-app 生命周期（mount / unmount），支持独立运行和被主应用嵌入。
+            子应用已配置 wujie 生命周期（__WUJIE_MOUNT / __WUJIE_UNMOUNT），支持独立运行和被主应用嵌入。
         </p>
         <dl class="about__info">
             <dt>技术栈</dt>
@@ -13,7 +13,7 @@
             <dt>跨域</dt>
             <dd>已配置 Access-Control-Allow-Origin</dd>
             <dt>路由模式</dt>
-            <dd>History 模式，支持 baseroute</dd>
+            <dd>Hash 模式，wujie 自动同步路由</dd>
         </dl>
     </div>
 </template>

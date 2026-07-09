@@ -1,28 +1,20 @@
 import bcrypt from 'bcryptjs'
 import { eq } from 'drizzle-orm'
 import type { MySql2Database } from 'drizzle-orm/mysql2'
-import { t } from 'elysia'
+import { Elysia, t } from 'elysia'
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import { env } from '../config/env'
-import type { BaseApp } from '../app'
-import { usersMysql, usersPg } from '../models/user'
+import { setup } from '../plugins/setup'
+import { getUsersTable, isMysqlDriver } from '../models'
 import { createSliderCaptcha, verifySliderCaptcha } from '../services/captcha'
 import { decryptRsaPassword, getPublicKeyPem } from '../services/crypto'
-import { createAccessToken, verifyAccessToken } from '../services/token'
-import { createSession, getSession, revokeSession } from '../services/session'
+import { getUserMenus, getUserPermissions, getRolesByUserId } from '../services/rbac'
+import { createSession, createSessionToken, getSession, revokeSession } from '../services/session'
 import { buildAuthCookie, clearAuthCookie, parseCookies, toPublicUser } from '../utils/auth'
+import { fail, success } from '../utils/response'
 
-const success = <T>(data: T) => ({
-    code: '200',
-    data,
-})
-
-const fail = (code: string, message: string) => ({
-    code,
-    data: message,
-})
-
-export const registerAuthRoutes = <T extends BaseApp>(app: T) => app
+export const authRoutes = new Elysia({ name: 'auth' })
+    .use(setup)
     .get('/api/auth/public-key', () => {
         return success({
             publicKeyPem: getPublicKeyPem(),
@@ -59,16 +51,17 @@ export const registerAuthRoutes = <T extends BaseApp>(app: T) => app
                 return fail('400', '密码解密失败')
             }
 
-            const rows = env.dbDriver === 'mysql'
+            const usersTable = getUsersTable()
+            const rows = isMysqlDriver()
                 ? await (db as MySql2Database)
                     .select()
-                    .from(usersMysql)
-                    .where(eq(usersMysql.username, body.username))
+                    .from(usersTable)
+                    .where(eq(usersTable.username, body.username))
                     .limit(1)
                 : await (db as PostgresJsDatabase)
                     .select()
-                    .from(usersPg)
-                    .where(eq(usersPg.username, body.username))
+                    .from(usersTable)
+                    .where(eq(usersTable.username, body.username))
                     .limit(1)
 
             const userRecord = rows[0]
@@ -83,12 +76,12 @@ export const registerAuthRoutes = <T extends BaseApp>(app: T) => app
                 return fail('500', '用户名或密码错误')
             }
 
-            const accessToken = createAccessToken(userRecord.id, userRecord.username)
-            await createSession(accessToken, {
+            const sessionToken = createSessionToken()
+            await createSession(sessionToken, {
                 userId: userRecord.id,
                 username: userRecord.username,
             })
-            set.headers['set-cookie'] = buildAuthCookie(accessToken)
+            set.headers['set-cookie'] = buildAuthCookie(sessionToken)
 
             return success(toPublicUser(userRecord))
         },
@@ -114,28 +107,23 @@ export const registerAuthRoutes = <T extends BaseApp>(app: T) => app
             return fail('401', '未登录')
         }
 
-        const payload = verifyAccessToken(token)
-        if (!payload) {
-            set.status = 401
-            return fail('401', '登录已过期')
-        }
-
         const session = await getSession(token)
-        if (!session || session.userId !== payload.userId) {
+        if (!session) {
             set.status = 401
             return fail('401', '登录已过期')
         }
 
-        const rows = env.dbDriver === 'mysql'
+        const usersTable = getUsersTable()
+        const rows = isMysqlDriver()
             ? await (db as MySql2Database)
                 .select()
-                .from(usersMysql)
-                .where(eq(usersMysql.id, payload.userId))
+                .from(usersTable)
+                .where(eq(usersTable.id, session.userId))
                 .limit(1)
             : await (db as PostgresJsDatabase)
                 .select()
-                .from(usersPg)
-                .where(eq(usersPg.id, payload.userId))
+                .from(usersTable)
+                .where(eq(usersTable.id, session.userId))
                 .limit(1)
 
         const userRecord = rows[0]
@@ -144,7 +132,32 @@ export const registerAuthRoutes = <T extends BaseApp>(app: T) => app
             return fail('401', '用户不存在')
         }
 
-        return success(toPublicUser(userRecord))
+        const roles = await getRolesByUserId(db, userRecord.id)
+        const permissions = await getUserPermissions(db, userRecord.id)
+
+        return success({
+            ...toPublicUser(userRecord),
+            roles: roles.map((role) => ({ id: role.id, code: role.code, name: role.name })),
+            permissions,
+        })
+    })
+    .get('/api/auth/menus', async ({ request, set, db }) => {
+        const cookieMap = parseCookies(request.headers.get('cookie'))
+        const token = cookieMap[env.cookieName]
+
+        if (!token) {
+            set.status = 401
+            return fail('401', '未登录')
+        }
+
+        const session = await getSession(token)
+        if (!session) {
+            set.status = 401
+            return fail('401', '登录已过期')
+        }
+
+        const menus = await getUserMenus(db, session.userId)
+        return success(menus)
     })
     .delete('/api/auth/logout', async ({ request, set }) => {
         const cookieMap = parseCookies(request.headers.get('cookie'))

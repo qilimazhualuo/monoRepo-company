@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { AppLogo } from 'wc-ui'
+import { basicNavList } from 'wc-basic'
 import { useUserStore } from '@/stores/user'
 
 const route = useRoute()
@@ -10,15 +11,29 @@ const userStore = useUserStore()
 
 const isLoginPage = computed(() => route.path === '/login')
 
-const navList = [
+const menuList = [
     { path: '/', label: '首页' },
+    ...basicNavList,
     { path: '/sub-app', label: '子应用' },
 ]
 
-const currentPath = computed(() => route.path)
+const selectedMenuKey = computed(() => {
+    const matchedMenu = [...menuList]
+        .sort((leftItem, rightItem) => rightItem.path.length - leftItem.path.length)
+        .find((menuItem) => {
+            if (menuItem.path === '/') {
+                return route.path === '/'
+            }
+            return route.path.startsWith(menuItem.path)
+        })
 
-const handleNavClick = (path: string) => {
-    router.push(path)
+    return matchedMenu?.path || '/'
+})
+
+const pageTitle = computed(() => String(route.meta.title || '首页'))
+
+const handleMenuClick = (menuPath: string) => {
+    router.push(menuPath)
 }
 
 const handleLogout = async () => {
@@ -30,31 +45,39 @@ const handleLogout = async () => {
 <template>
     <router-view v-if="isLoginPage" />
 
-    <div v-else class="main-app">
-        <header class="main-app__header">
-            <AppLogo text="Micro App 主应用" />
-            <div class="main-app__actions">
-                <nav class="main-app__nav">
-                    <button
-                        v-for="navItem in navList"
-                        :key="navItem.path"
-                        class="main-app__nav-item"
-                        :class="{ 'main-app__nav-item--active': currentPath.startsWith(navItem.path) && (navItem.path !== '/' || currentPath === '/') }"
-                        @click="handleNavClick(navItem.path)"
-                    >
-                        {{ navItem.label }}
-                    </button>
-                </nav>
+    <a-layout v-else class="main-app">
+        <a-layout-sider class="main-app__sider" :width="220">
+            <div class="main-app__logo">
+                <AppLogo text="Micro App" />
+            </div>
+
+            <a-menu
+                class="main-app__menu"
+                mode="inline"
+                :selected-keys="[selectedMenuKey]"
+                @click="({ key }) => handleMenuClick(String(key))"
+            >
+                <a-menu-item v-for="menuItem in menuList" :key="menuItem.path">
+                    {{ menuItem.label }}
+                </a-menu-item>
+            </a-menu>
+        </a-layout-sider>
+
+        <a-layout class="main-app__layout">
+            <a-layout-header class="main-app__header">
+                <h2 class="main-app__title">{{ pageTitle }}</h2>
+
                 <div class="main-app__user">
                     <span>{{ userStore.userInfo?.nickname || userStore.userInfo?.username }}</span>
                     <a-button size="small" @click="handleLogout">退出</a-button>
                 </div>
-            </div>
-        </header>
-        <main class="main-app__content">
-            <router-view />
-        </main>
-    </div>
+            </a-layout-header>
+
+            <a-layout-content class="main-app__content">
+                <router-view />
+            </a-layout-content>
+        </a-layout>
+    </a-layout>
 </template>
 
 <style lang="less" scoped>
@@ -62,47 +85,43 @@ const handleLogout = async () => {
     min-height: 100vh;
     background: #f5f7fa;
 
+    &__sider {
+        background: #fff;
+        box-shadow: 2px 0 8px rgba(0, 0, 0, 0.06);
+    }
+
+    &__logo {
+        display: flex;
+        align-items: center;
+        height: 56px;
+        padding: 0 16px;
+        border-bottom: 1px solid #f0f0f0;
+    }
+
+    &__menu {
+        border-inline-end: none;
+        padding: 8px 0;
+    }
+
+    &__layout {
+        background: #f5f7fa;
+    }
+
     &__header {
         display: flex;
         align-items: center;
         justify-content: space-between;
-        padding: 0 24px;
         height: 56px;
+        padding: 0 24px;
         background: #fff;
-        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
     }
 
-    &__actions {
-        display: flex;
-        align-items: center;
-        gap: 16px;
-    }
-
-    &__nav {
-        display: flex;
-        gap: 8px;
-    }
-
-    &__nav-item {
-        padding: 6px 16px;
-        border: none;
-        border-radius: 6px;
-        background: transparent;
-        color: #666;
-        font-size: 14px;
-        cursor: pointer;
-        transition: all 0.2s;
-
-        &:hover {
-            background: #f0f2f5;
-            color: #333;
-        }
-
-        &--active {
-            background: #e8f0fe;
-            color: #1a73e8;
-            font-weight: 500;
-        }
+    &__title {
+        margin: 0;
+        font-size: 16px;
+        font-weight: 600;
+        color: #2c3e50;
     }
 
     &__user {
@@ -114,7 +133,11 @@ const handleLogout = async () => {
     }
 
     &__content {
-        padding: 24px;
+        margin: 16px;
+        padding: 20px;
+        min-height: calc(100vh - 88px);
+        background: #fff;
+        border-radius: 8px;
     }
 }
 </style>

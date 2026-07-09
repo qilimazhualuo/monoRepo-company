@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto'
+import { createHash, randomBytes } from 'node:crypto'
 import Redis from 'ioredis'
 import { env } from '../config/env'
 
@@ -8,6 +8,8 @@ export interface SessionRecord {
 }
 
 let redisClient: Redis | null = null
+
+export const createSessionToken = () => randomBytes(32).toString('base64url')
 
 const buildSessionKey = (token: string) => {
     const tokenHash = createHash('sha256').update(token).digest('hex')
