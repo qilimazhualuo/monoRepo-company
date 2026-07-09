@@ -13,7 +13,7 @@
             <dt>跨域</dt>
             <dd>已配置 Access-Control-Allow-Origin</dd>
             <dt>路由模式</dt>
-            <dd>Hash 模式，wujie 自动同步路由</dd>
+            <dd>History 模式，wujie 自动同步路由</dd>
         </dl>
     </div>
 </template>

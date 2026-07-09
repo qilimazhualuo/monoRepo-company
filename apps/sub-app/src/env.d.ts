@@ -12,4 +12,12 @@ interface Window {
     __WUJIE_UNMOUNTED?: boolean
     __WUJIE_MOUNT: () => void
     __WUJIE_UNMOUNT: () => void
+    $wujie?: {
+        bus: {
+            $on: (event: string, handler: (...args: unknown[]) => void) => void
+            $off: (event: string, handler?: (...args: unknown[]) => void) => void
+            $emit: (event: string, ...args: unknown[]) => void
+        }
+        props: Record<string, unknown>
+    }
 }

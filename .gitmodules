@@ -1,0 +1,18 @@
+[submodule "packages/wc-basic"]
+	path = packages/wc-basic
+	url = https://github.com/qilimazhualuo/wc-basic.git
+[submodule "packages/wc-page"]
+	path = packages/wc-page
+	url = https://github.com/qilimazhualuo/wc-page.git
+[submodule "packages/wc-ui"]
+	path = packages/wc-ui
+	url = https://github.com/qilimazhualuo/wc-ui.git
+[submodule "packages/wc-utils"]
+	path = packages/wc-utils
+	url = https://github.com/qilimazhualuo/wc-utils.git
+[submodule "packages/map2"]
+	path = packages/map2
+	url = https://github.com/qilimazhualuo/map2.git
+[submodule "packages/map3"]
+	path = packages/map3
+	url = https://github.com/qilimazhualuo/map3.git

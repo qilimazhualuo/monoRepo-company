@@ -14,9 +14,20 @@ const mountApp = () => {
     appInstance.use(createPinia())
     appInstance.use(router)
     appInstance.mount('#app')
+
+    // 挂载后导航到主应用传入的初始路由
+    if (window.$wujie?.props?.initialPath) {
+        router.push(window.$wujie.props.initialPath as string)
+    }
+
+    // 监听主应用后续路由切换
+    window.$wujie?.bus?.$on('sub-app-route-change', (path: unknown) => {
+        router.push(path as string)
+    })
 }
 
 const unmountApp = () => {
+    window.$wujie?.bus?.$off('sub-app-route-change')
     appInstance?.unmount()
     appInstance = null
 }
@@ -25,12 +36,9 @@ const unmountApp = () => {
 if (window.__POWERED_BY_WUJIE__) {
     window.__WUJIE_MOUNT = mountApp
     window.__WUJIE_UNMOUNT = unmountApp
-    // wujie 会在合适的时机主动调用 mount
-    // 如果此时 wujie 还未触发 mount，也要主动挂载一次
     if (!window.__WUJIE_MOUNTED) {
         mountApp()
     }
 } else {
-    // 独立运行时直接挂载
     mountApp()
 }

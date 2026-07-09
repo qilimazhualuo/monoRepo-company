@@ -1,6 +1,0 @@
-export { default as WcPage } from './components/WcPage.vue'
-export { default as WcDrawer } from './layout/WcDrawer.vue'
-export { default as WcModal } from './layout/WcModal.vue'
-export { default as WcDetail } from './block/WcDetail.vue'
-export { PAGE_SIZE_OPTIONS, formatTotalText } from './utils/pagination'
-export type { PageField, SearchField, TreeConfig, FieldDataType } from './types/field'

@@ -1,10 +1,6 @@
 import { createRouter, createWebHashHistory, type RouteRecordRaw } from 'vue-router'
 
-import { basicChildRoutes } from 'wc-basic'
-
 import RootApp from '@/RootApp.vue'
-
-
 
 const childRoutes: RouteRecordRaw[] = [
 
@@ -31,20 +27,6 @@ const childRoutes: RouteRecordRaw[] = [
         meta: { title: '关于' },
 
     },
-
-    ...basicChildRoutes.map((routeItem) => ({
-
-        ...routeItem,
-
-        meta: {
-
-            ...routeItem.meta,
-
-            requiresAuth: false,
-
-        },
-
-    })),
 
 ]
 

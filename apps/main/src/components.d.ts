@@ -33,11 +33,13 @@ declare module 'vue' {
     ASelectOption: typeof import('antdv-next')['SelectOption']
     ASpace: typeof import('antdv-next')['Space']
     ASpin: typeof import('antdv-next')['Spin']
+    ASubMenu: typeof import('antdv-next')['SubMenu']
     ATable: typeof import('antdv-next')['Table']
     ATag: typeof import('antdv-next')['Tag']
     ATooltip: typeof import('antdv-next')['Tooltip']
     ATree: typeof import('antdv-next')['Tree']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
+    SidebarMenu: typeof import('./components/SidebarMenu.vue')['default']
   }
 }

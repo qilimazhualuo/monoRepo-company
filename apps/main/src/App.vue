@@ -1,33 +1,49 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import type { MenuItem } from 'wc-utils'
 import { AppLogo } from 'wc-ui'
-import { basicNavList } from 'wc-basic'
 import { useUserStore } from '@/stores/user'
+import { useMenuStore } from '@/stores/menu'
+import SidebarMenu from '@/components/SidebarMenu.vue'
 
 const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
+const menuStore = useMenuStore()
 
 const isLoginPage = computed(() => route.path === '/login')
 
-const menuList = [
-    { path: '/', label: '首页' },
-    ...basicNavList,
-    { path: '/sub-app', label: '子应用' },
-]
+const findMenuByPath = (items: MenuItem[], targetPath: string): MenuItem | undefined => {
+    for (const item of items) {
+        if (item.path === targetPath) return item
+        if (item.children) {
+            const found = findMenuByPath(item.children, targetPath)
+            if (found) return found
+        }
+    }
+    return undefined
+}
+
+const findAncestorKeys = (items: MenuItem[], targetId: number, keys: string[] = []): string[] => {
+    for (const item of items) {
+        if (item.id === targetId) return keys
+        if (item.children) {
+            const found = findAncestorKeys(item.children, targetId, [...keys, `menu-${item.id}`])
+            if (found.length) return found
+        }
+    }
+    return []
+}
 
 const selectedMenuKey = computed(() => {
-    const matchedMenu = [...menuList]
-        .sort((leftItem, rightItem) => rightItem.path.length - leftItem.path.length)
-        .find((menuItem) => {
-            if (menuItem.path === '/') {
-                return route.path === '/'
-            }
-            return route.path.startsWith(menuItem.path)
-        })
+    const matched = findMenuByPath(menuStore.menuTree, route.path)
+    return matched ? `menu-${matched.id}` : ''
+})
 
-    return matchedMenu?.path || '/'
+const openKeys = computed(() => {
+    const matched = findMenuByPath(menuStore.menuTree, route.path)
+    return matched ? findAncestorKeys(menuStore.menuTree, matched.id) : []
 })
 
 const pageTitle = computed(() => String(route.meta.title || '首页'))
@@ -52,14 +68,12 @@ const handleLogout = async () => {
             </div>
 
             <a-menu
+                v-model:openKeys="openKeys"
                 class="main-app__menu"
                 mode="inline"
                 :selected-keys="[selectedMenuKey]"
-                @click="({ key }) => handleMenuClick(String(key))"
             >
-                <a-menu-item v-for="menuItem in menuList" :key="menuItem.path">
-                    {{ menuItem.label }}
-                </a-menu-item>
+                <SidebarMenu :items="menuStore.menuTree" @select="handleMenuClick" />
             </a-menu>
         </a-layout-sider>
 

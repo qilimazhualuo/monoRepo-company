@@ -5,12 +5,12 @@
         "apps/*",
         "packages/*",
         "plugins/*",
-        "server"
+        "server/*"
     ],
     "scripts": {
         "dev": "concurrently -n server,main,sub -c magenta,blue,green \"yarn dev:server\" \"yarn dev:main\" \"yarn dev:sub\"",
         "dev:packages": "concurrently -n utils,page,ui,basic \"yarn workspace wc-utils build --watch\" \"yarn workspace wc-page build --watch\" \"yarn workspace wc-ui build --watch\" \"yarn workspace wc-basic build --watch\"",
-        "dev:server": "yarn workspace server dev",
+        "dev:server": "yarn workspace server-main dev",
         "dev:main": "yarn workspace main dev",
         "dev:sub": "yarn workspace sub-app dev",
         "build:packages": "node scripts/build-packages.mjs",
