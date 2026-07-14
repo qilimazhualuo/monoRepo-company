@@ -9,7 +9,7 @@ export const SHARED_SURFACE_VIRTUAL_ID = 'virtual:shared-chunks-consumer-surface
 export const SHARED_SURFACE_RESOLVED_ID = '\0virtual:shared-chunks-consumer-surface'
 export const SHARED_SURFACE_ENTRY_NAME = 'shared-chunks-surface'
 
-/** 单文�?shared chunk：export * 可保留完�?API 的包 */
+/** 单文�?shared chunk：export * 可保留完�?API 的包 */
 const FULL_REEXPORT_PACKAGES = new Set([
     'pinia',
 ])
@@ -352,7 +352,7 @@ const collectDistAssetFiles = (distDir: string): string[] => {
     return assetFiles
 }
 
-/** consumer 已构建时，从产物里收集对 /shared/*.js 的具�?import（含 Vue 编译�?helper�?*/
+/** consumer 已构建时，从产物里收集对 /shared/*.js 的具�?import（含 Vue 编译�?helper�?*/
 export const scanConsumerDistSharedImports = (consumerRoots: string[]): Map<string, Set<string>> => {
     const exportsByChunk = new Map<string, Set<string>>()
     const sharedImportPattern = /import\s*\{([^}]+)\}\s*from\s*["'](\/shared[^"']+)["']/g

@@ -16,3 +16,6 @@
 [submodule "packages/map3"]
 	path = packages/map3
 	url = https://github.com/qilimazhualuo/map3.git
+[submodule "packages/map"]
+	path = packages/map
+	url = https://github.com/qilimazhualuo/map.git
