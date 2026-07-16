@@ -1,4 +1,6 @@
 <script setup lang="ts">
+defineOptions({ name: 'sub-app' })
+
 import { ref, computed, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { bus } from 'wujie'
@@ -49,10 +51,13 @@ const handleSubAppReady = () => {
 </template>
 
 <style lang="less" scoped>
+@import '@/styles/theme-vars.less';
+
 .sub-app-container {
-    background: #fff;
-    border-radius: 12px;
-    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+    background: @app-color-bg-container;
+    border-radius: @app-border-radius-lg;
+    box-shadow: @app-box-shadow;
+    border: 1px solid @app-color-border-secondary;
     overflow: hidden;
     min-height: 500px;
 }

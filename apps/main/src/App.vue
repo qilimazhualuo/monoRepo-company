@@ -1,24 +1,52 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import type { MenuItem } from 'wc-utils'
 import { AppLogo } from 'wc-ui'
 import { useUserStore } from '@/stores/user'
 import { useMenuStore } from '@/stores/menu'
-import SidebarMenu from '@/components/SidebarMenu.vue'
+import { useTagsStore } from '@/stores/tags'
+import TagsView from '@/components/TagsView.vue'
+import ThemeProvider from '@/components/ThemeProvider.vue'
+import ThemeSwitcher from '@/components/ThemeSwitcher.vue'
+import { useThemeStore } from '@/stores/theme'
+
+type AntdMenuItem = {
+    key: string
+    label: string
+    children?: AntdMenuItem[]
+}
 
 const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
 const menuStore = useMenuStore()
+const tagsStore = useTagsStore()
+const themeStore = useThemeStore()
+
+const openKeys = ref<string[]>([])
 
 const isLoginPage = computed(() => route.path === '/login')
+const isDarkTheme = computed(() => (
+    themeStore.currentTheme === 'dark' || themeStore.currentTheme === 'geek'
+))
 
 const findMenuByPath = (items: MenuItem[], targetPath: string): MenuItem | undefined => {
     for (const item of items) {
         if (item.path === targetPath) return item
         if (item.children) {
             const found = findMenuByPath(item.children, targetPath)
+            if (found) return found
+        }
+    }
+    return undefined
+}
+
+const findMenuById = (items: MenuItem[], targetId: number): MenuItem | undefined => {
+    for (const item of items) {
+        if (item.id === targetId) return item
+        if (item.children) {
+            const found = findMenuById(item.children, targetId)
             if (found) return found
         }
     }
@@ -36,20 +64,60 @@ const findAncestorKeys = (items: MenuItem[], targetId: number, keys: string[] = 
     return []
 }
 
+const toAntdMenuItems = (items: MenuItem[]): AntdMenuItem[] => {
+    return items.flatMap((item) => {
+        if (item.type === 'dir' && item.children?.length) {
+            return [{
+                key: `menu-${item.id}`,
+                label: item.name,
+                children: toAntdMenuItems(item.children),
+            }]
+        }
+
+        if (item.type === 'menu' && item.path) {
+            return [{
+                key: `menu-${item.id}`,
+                label: item.name,
+            }]
+        }
+
+        return []
+    })
+}
+
+const antdMenuItems = computed(() => toAntdMenuItems(menuStore.menuTree))
+
+const resolveActiveMenu = () => {
+    if (route.path === '/basic/dict-data') {
+        return findMenuByPath(menuStore.menuTree, '/basic/dict-type')
+    }
+    return findMenuByPath(menuStore.menuTree, route.path)
+}
+
 const selectedMenuKey = computed(() => {
-    const matched = findMenuByPath(menuStore.menuTree, route.path)
+    const matched = resolveActiveMenu()
     return matched ? `menu-${matched.id}` : ''
 })
 
-const openKeys = computed(() => {
-    const matched = findMenuByPath(menuStore.menuTree, route.path)
-    return matched ? findAncestorKeys(menuStore.menuTree, matched.id) : []
-})
+const syncOpenKeys = () => {
+    const matched = resolveActiveMenu()
+    openKeys.value = matched ? findAncestorKeys(menuStore.menuTree, matched.id) : []
+}
 
-const pageTitle = computed(() => String(route.meta.title || '首页'))
+watch(
+    () => [route.path, menuStore.menuTree] as const,
+    () => syncOpenKeys(),
+    { immediate: true, deep: true },
+)
 
-const handleMenuClick = (menuPath: string) => {
-    router.push(menuPath)
+const handleMenuClick = (info: { key: string | number }) => {
+    const menuId = Number(String(info.key).replace('menu-', ''))
+    if (Number.isNaN(menuId)) return
+
+    const matched = findMenuById(menuStore.menuTree, menuId)
+    if (matched?.path) {
+        router.push(matched.path)
+    }
 }
 
 const handleLogout = async () => {
@@ -59,49 +127,58 @@ const handleLogout = async () => {
 </script>
 
 <template>
-    <router-view v-if="isLoginPage" />
+    <ThemeProvider>
+        <router-view v-if="isLoginPage" />
 
-    <a-layout v-else class="main-app">
-        <a-layout-sider class="main-app__sider" :width="220">
-            <div class="main-app__logo">
-                <AppLogo text="Micro App" />
-            </div>
-
-            <a-menu
-                v-model:openKeys="openKeys"
-                class="main-app__menu"
-                mode="inline"
-                :selected-keys="[selectedMenuKey]"
-            >
-                <SidebarMenu :items="menuStore.menuTree" @select="handleMenuClick" />
-            </a-menu>
-        </a-layout-sider>
-
-        <a-layout class="main-app__layout">
-            <a-layout-header class="main-app__header">
-                <h2 class="main-app__title">{{ pageTitle }}</h2>
-
-                <div class="main-app__user">
-                    <span>{{ userStore.userInfo?.nickname || userStore.userInfo?.username }}</span>
-                    <a-button size="small" @click="handleLogout">退出</a-button>
+        <a-layout v-else class="main-app">
+            <a-layout-sider class="main-app__sider" :width="220">
+                <div class="main-app__logo">
+                    <AppLogo text="Micro App" />
                 </div>
-            </a-layout-header>
 
-            <a-layout-content class="main-app__content">
-                <router-view />
-            </a-layout-content>
+                <a-menu
+                    v-model:openKeys="openKeys"
+                    class="main-app__menu"
+                    mode="inline"
+                    :theme="isDarkTheme ? 'dark' : 'light'"
+                    :selected-keys="[selectedMenuKey]"
+                    :items="antdMenuItems"
+                    @click="handleMenuClick"
+                />
+            </a-layout-sider>
+
+            <a-layout class="main-app__layout">
+                <a-layout-header class="main-app__header">
+                    <TagsView />
+
+                    <div class="main-app__user">
+                        <ThemeSwitcher />
+                        <span>{{ userStore.userInfo?.nickname || userStore.userInfo?.username }}</span>
+                        <a-button size="small" @click="handleLogout">退出</a-button>
+                    </div>
+                </a-layout-header>
+
+                <a-layout-content class="main-app__content">
+                    <router-view v-slot="{ Component }">
+                        <keep-alive :max="tagsStore.MAX_CACHE" :include="tagsStore.cachedViews">
+                            <component :is="Component" :key="route.path" />
+                        </keep-alive>
+                    </router-view>
+                </a-layout-content>
+            </a-layout>
         </a-layout>
-    </a-layout>
+    </ThemeProvider>
 </template>
 
 <style lang="less" scoped>
+@import '@/styles/theme-vars.less';
+
 .main-app {
     min-height: 100vh;
-    background: #f5f7fa;
+    background: @app-color-bg-layout;
 
     &__sider {
-        background: #fff;
-        box-shadow: 2px 0 8px rgba(0, 0, 0, 0.06);
+        box-shadow: @app-box-shadow;
     }
 
     &__logo {
@@ -109,7 +186,7 @@ const handleLogout = async () => {
         align-items: center;
         height: 56px;
         padding: 0 16px;
-        border-bottom: 1px solid #f0f0f0;
+        border-bottom: 1px solid @app-color-split;
     }
 
     &__menu {
@@ -117,41 +194,38 @@ const handleLogout = async () => {
         padding: 8px 0;
     }
 
-    &__layout {
-        background: #f5f7fa;
-    }
-
     &__header {
         display: flex;
         align-items: center;
-        justify-content: space-between;
+        gap: 16px;
         height: 56px;
         padding: 0 24px;
-        background: #fff;
-        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
-    }
-
-    &__title {
-        margin: 0;
-        font-size: 16px;
-        font-weight: 600;
-        color: #2c3e50;
+        box-shadow: @app-box-shadow;
+        color: @app-color-text;
     }
 
     &__user {
         display: flex;
         align-items: center;
+        flex-shrink: 0;
         gap: 12px;
-        color: #666;
         font-size: 14px;
+        color: @app-color-text-secondary;
     }
 
     &__content {
         margin: 16px;
         padding: 20px;
         min-height: calc(100vh - 88px);
-        background: #fff;
-        border-radius: 8px;
+        border-radius: @app-border-radius-lg;
+        background: @app-color-bg-container !important;
+        box-shadow: @app-box-shadow;
+        color: @app-color-text;
+    }
+
+    :deep(.ant-layout),
+    :deep(.ant-layout-content) {
+        background: transparent;
     }
 }
 </style>

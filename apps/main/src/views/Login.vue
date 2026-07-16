@@ -95,12 +95,19 @@ onMounted(() => {
 </template>
 
 <style lang="less" scoped>
+@import '@/styles/theme-vars.less';
+
 .login-page {
     display: flex;
     align-items: center;
     justify-content: flex-end;
     min-height: 100vh;
-    background: linear-gradient(135deg, #1a3a6b 0%, #4a85f9 45%, #d8e7ff 100%);
+    background: linear-gradient(
+        135deg,
+        @app-color-primary 0%,
+        @app-color-primary-hover 45%,
+        @app-color-primary-bg 100%
+    );
 
     &__panel {
         display: flex;
@@ -110,9 +117,14 @@ onMounted(() => {
         min-width: 480px;
         min-height: 100vh;
         padding: 48px 24px;
-        background: linear-gradient(158deg, #f5f6fa 2.01%, rgba(255, 255, 255, 0.92) 97.19%);
-        box-shadow: -2px 0 10px rgba(229, 229, 229, 0.55);
+        background: linear-gradient(
+            158deg,
+            @app-color-bg-layout 2.01%,
+            @app-color-bg-container 97.19%
+        );
+        box-shadow: @app-box-shadow;
         backdrop-filter: blur(4px);
+        color: @app-color-text;
     }
 }
 </style>

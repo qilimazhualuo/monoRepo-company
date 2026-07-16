@@ -20,7 +20,7 @@ import {
 const defaultMenus = [
     { parentKey: null, key: 'basic', name: '基础数据', type: 'dir', path: null, permission: null, sort: 2 },
     { parentKey: 'basic', key: 'dict-type', name: '字典类型', type: 'menu', path: '/basic/dict-type', permission: 'basic:dict-type:list', sort: 1 },
-    { parentKey: 'basic', key: 'dict-data', name: '字典数据', type: 'menu', path: '/basic/dict-data', permission: 'basic:dict-data:list', sort: 2 },
+    { parentKey: 'basic', key: 'dict-data', name: '字典数据', type: 'button', path: '/basic/dict-data', permission: 'basic:dict-data:list', sort: 2 },
     { parentKey: null, key: 'system', name: '系统管理', type: 'dir', path: null, permission: null, sort: 1 },
     { parentKey: 'system', key: 'org', name: '单位管理', type: 'menu', path: '/system/org', permission: 'system:org:list', sort: 1 },
     { parentKey: 'system', key: 'user', name: '人员管理', type: 'menu', path: '/system/user', permission: 'system:user:list', sort: 2 },
@@ -217,6 +217,21 @@ export const seedPlugin = new Elysia({ name: 'seed' })
                 if (menu.path === '/sub-app') menuIdMap.set('sub-app-home', menu.id)
                 if (menu.path === '/sub-app/about') menuIdMap.set('sub-app-about', menu.id)
             })
+
+            const dictDataMenu = allMenus.find((menu) => menu.path === '/basic/dict-data')
+            if (dictDataMenu && dictDataMenu.type === 'menu') {
+                if (isMysqlDriver()) {
+                    await (database as MySql2Database)
+                        .update(menusTable)
+                        .set({ type: 'button' })
+                        .where(eq(menusTable.id, dictDataMenu.id))
+                } else {
+                    await (database as PostgresJsDatabase)
+                        .update(menusTable)
+                        .set({ type: 'button' })
+                        .where(eq(menusTable.id, dictDataMenu.id))
+                }
+            }
         }
 
         const existingDictTypes = isMysqlDriver()

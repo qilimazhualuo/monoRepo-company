@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import type { PublicUser } from '@/api/auth'
 import { fetchCurrentUser, logout as logoutRequest } from '@/api/auth'
 import { useMenuStore } from '@/stores/menu'
+import { useTagsStore } from '@/stores/tags'
 
 export const useUserStore = defineStore('user', () => {
     const isLoggedIn = ref(false)
@@ -22,6 +23,9 @@ export const useUserStore = defineStore('user', () => {
 
         const menuStore = useMenuStore()
         menuStore.clearMenus()
+
+        const tagsStore = useTagsStore()
+        tagsStore.clearAll()
     }
 
     const restoreSession = async () => {

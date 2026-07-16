@@ -1,16 +1,56 @@
 import { eq, inArray } from 'drizzle-orm'
 import type { MySql2Database } from 'drizzle-orm/mysql2'
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
+import { env } from '../config/env'
 import type { DatabaseInstance } from '../db'
 import {
     getMenusTable,
     getRoleMenusTable,
     getRolesTable,
     getUserRolesTable,
+    getUsersTable,
     isMysqlDriver,
 } from '../models'
 import type { MenuRecord } from '../models/menu'
 import { buildTree } from '../utils/tree'
+
+const isSuperAdmin = async (database: DatabaseInstance, userId: number) => {
+    const usersTable = getUsersTable()
+    const rows = isMysqlDriver()
+        ? await (database as MySql2Database)
+            .select({ username: usersTable.username })
+            .from(usersTable)
+            .where(eq(usersTable.id, userId))
+            .limit(1)
+        : await (database as PostgresJsDatabase)
+            .select({ username: usersTable.username })
+            .from(usersTable)
+            .where(eq(usersTable.id, userId))
+            .limit(1)
+
+    return rows[0]?.username === env.defaultAdminUsername
+}
+
+const toMenuTreeNode = (menu: MenuRecord) => ({
+    id: menu.id,
+    parentId: menu.parentId,
+    name: menu.name,
+    type: menu.type,
+    path: menu.path,
+    permission: menu.permission,
+    icon: menu.icon,
+    sort: menu.sort,
+    status: menu.status,
+})
+
+const getActiveMenus = async (database: DatabaseInstance) => {
+    const menusTable = getMenusTable()
+    const allMenus = isMysqlDriver()
+        ? await (database as MySql2Database).select().from(menusTable)
+        : await (database as PostgresJsDatabase).select().from(menusTable)
+
+    return (allMenus as MenuRecord[]).filter((menu) => menu.status === 1)
+}
 
 export const getUserRoleIds = async (database: DatabaseInstance, userId: number) => {
     const userRolesTable = getUserRolesTable()
@@ -63,13 +103,17 @@ export const getUserMenuIds = async (database: DatabaseInstance, userId: number)
 }
 
 export const getUserMenus = async (database: DatabaseInstance, userId: number) => {
-    const menuIds = await getUserMenuIds(database, userId)
-    const menusTable = getMenusTable()
-    const allMenus = isMysqlDriver()
-        ? await (database as MySql2Database).select().from(menusTable)
-        : await (database as PostgresJsDatabase).select().from(menusTable)
+    const activeMenus = await getActiveMenus(database)
 
-    const activeMenus = (allMenus as MenuRecord[]).filter((menu) => menu.status === 1)
+    if (await isSuperAdmin(database, userId)) {
+        return buildTree(
+            activeMenus
+                .filter((menu) => menu.type !== 'button')
+                .map(toMenuTreeNode),
+        )
+    }
+
+    const menuIds = await getUserMenuIds(database, userId)
     if (menuIds.length === 0) {
         return []
     }
@@ -93,32 +137,26 @@ export const getUserMenus = async (database: DatabaseInstance, userId: number) =
     return buildTree(
         visibleMenus
             .filter((menu) => menu.type !== 'button')
-            .map((menu) => ({
-                id: menu.id,
-                parentId: menu.parentId,
-                name: menu.name,
-                type: menu.type,
-                path: menu.path,
-                permission: menu.permission,
-                icon: menu.icon,
-                sort: menu.sort,
-                status: menu.status,
-            })),
+            .map(toMenuTreeNode),
     )
 }
 
 export const getUserPermissions = async (database: DatabaseInstance, userId: number) => {
+    if (await isSuperAdmin(database, userId)) {
+        const activeMenus = await getActiveMenus(database)
+        return activeMenus
+            .filter((menu) => menu.permission)
+            .map((menu) => menu.permission as string)
+    }
+
     const menuIds = await getUserMenuIds(database, userId)
     if (menuIds.length === 0) {
         return []
     }
 
-    const menusTable = getMenusTable()
-    const allMenus = isMysqlDriver()
-        ? await (database as MySql2Database).select().from(menusTable)
-        : await (database as PostgresJsDatabase).select().from(menusTable)
+    const activeMenus = await getActiveMenus(database)
 
-    return (allMenus as MenuRecord[])
+    return activeMenus
         .filter((menu) => menuIds.includes(menu.id) && menu.permission)
         .map((menu) => menu.permission as string)
 }

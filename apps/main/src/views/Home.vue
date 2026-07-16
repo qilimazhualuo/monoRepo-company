@@ -1,4 +1,6 @@
 <script setup lang="ts">
+defineOptions({ name: 'home' })
+
 import { computed } from 'vue'
 import { AppLogo, PageHeader } from 'wc-ui'
 import { formatDate } from 'wc-utils'
@@ -39,17 +41,20 @@ const currentTime = computed(() => formatDate(new Date()))
 </template>
 
 <style lang="less" scoped>
+@import '@/styles/theme-vars.less';
+
 .home {
     &__card {
         padding: 24px;
-        background: #fff;
-        border-radius: 12px;
-        box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+        background: @app-color-bg-container;
+        border-radius: @app-border-radius-lg;
+        box-shadow: @app-box-shadow;
+        border: 1px solid @app-color-border-secondary;
     }
 
     &__desc {
         margin: 0 0 20px;
-        color: #666;
+        color: @app-color-text-secondary;
         line-height: 1.6;
     }
 
