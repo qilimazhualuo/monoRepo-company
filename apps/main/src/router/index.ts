@@ -18,8 +18,9 @@ const router = createRouter({
             meta: { title: '首页', requiresAuth: true },
         },
         ...basicRoutes,
+        // main 未声明的路径一律交给子应用（须放在路由表最后）
         {
-            path: '/sub-app/:pathMatch(.*)*',
+            path: '/:pathMatch(.*)*',
             name: 'sub-app',
             component: () => import('@/views/SubApp.vue'),
             meta: { title: '子应用', requiresAuth: true },

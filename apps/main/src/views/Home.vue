@@ -41,8 +41,6 @@ const currentTime = computed(() => formatDate(new Date()))
 </template>
 
 <style lang="less" scoped>
-@import '@/styles/theme-vars.less';
-
 .home {
     &__card {
         padding: 24px;

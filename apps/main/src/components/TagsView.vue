@@ -4,10 +4,12 @@ defineOptions({ name: 'TagsView' })
 import { ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useTagsStore } from '@/stores/tags'
+import { useMenuStore } from '@/stores/menu'
 
 const route = useRoute()
 const router = useRouter()
 const tagsStore = useTagsStore()
+const menuStore = useMenuStore()
 const routerReady = ref(false)
 
 const syncVisited = () => {
@@ -24,6 +26,15 @@ router.isReady().then(() => {
 watch(
     () => route.fullPath,
     () => syncVisited(),
+)
+
+watch(
+    () => menuStore.menuTree,
+    () => {
+        tagsStore.refreshTitles()
+        syncVisited()
+    },
+    { deep: true },
 )
 
 const handleTagClick = (targetPath: string, targetFullPath: string) => {
@@ -67,8 +78,6 @@ const handleTagClose = (event: Event, targetPath: string) => {
 </template>
 
 <style lang="less" scoped>
-@import '@/styles/theme-vars.less';
-
 .tags-view {
     flex: 1;
     display: flex;

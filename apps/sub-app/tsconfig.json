@@ -25,7 +25,9 @@
             "wc-basic": ["../../packages/wc-basic/src"],
             "wc-basic/*": ["../../packages/wc-basic/src/*"],
             "wc-page": ["../../packages/wc-page/src"],
-            "wc-page/*": ["../../packages/wc-page/src/*"]
+            "wc-page/*": ["../../packages/wc-page/src/*"],
+            "wc-theme": ["../../packages/wc-theme/src"],
+            "wc-theme/*": ["../../packages/wc-theme/src/*"]
         }
     },
     "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.vue", "src/components.d.ts"]

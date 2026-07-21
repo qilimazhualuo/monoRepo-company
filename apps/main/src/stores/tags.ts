@@ -1,6 +1,8 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import type { RouteLocationNormalizedLoaded } from 'vue-router'
+import type { MenuItem } from 'wc-utils'
+import { useMenuStore } from '@/stores/menu'
 
 export type VisitedView = {
     path: string
@@ -14,21 +16,47 @@ const MAX_CACHE = 5
 const HOME_PATH = '/'
 const HOME_TITLE = '首页'
 
-const resolveTitle = (route: RouteLocationNormalizedLoaded) => {
-    if (route.path === HOME_PATH || route.name === 'home') {
-        return HOME_TITLE
+const findMenuByPath = (items: MenuItem[], path: string): MenuItem | null => {
+    for (const item of items) {
+        if (item.path === path) return item
+        if (item.children?.length) {
+            const found = findMenuByPath(item.children, path)
+            if (found) return found
+        }
     }
+    return null
+}
+
+/** 精确匹配优先，否则按路径前缀找最长菜单项（子应用深层路由用） */
+const findMenuTitleByPath = (menuTree: MenuItem[], path: string): string | null => {
+    const exact = findMenuByPath(menuTree, path)
+    if (exact?.name) return exact.name
+
+    const segments = path.split('/').filter(Boolean)
+    while (segments.length > 0) {
+        const candidate = `/${segments.join('/')}`
+        const matched = findMenuByPath(menuTree, candidate)
+        if (matched?.name) return matched.name
+        segments.pop()
+    }
+
+    return null
+}
+
+const resolveTitle = (route: RouteLocationNormalizedLoaded, menuTree: MenuItem[]) => {
+    if (route.path === HOME_PATH || route.name === 'home') {
+        return findMenuTitleByPath(menuTree, HOME_PATH) || HOME_TITLE
+    }
+
+    const menuTitle = findMenuTitleByPath(menuTree, route.path)
+
     if (route.path === '/basic/dict-data') {
         const dictTypeName = String(route.query.dictTypeName || route.query.dictType || '')
-        return dictTypeName ? `字典数据 · ${dictTypeName}` : '字典数据'
+        const baseTitle = menuTitle || '字典数据'
+        return dictTypeName ? `${baseTitle} · ${dictTypeName}` : baseTitle
     }
 
-    const matchedTitle = [...route.matched]
-        .reverse()
-        .map((record) => record.meta.title)
-        .find((title) => typeof title === 'string' && title)
-
-    return String(matchedTitle || route.meta.title || '未命名')
+    return menuTitle || '未命名'
 }
 
 const resolveRouteName = (route: RouteLocationNormalizedLoaded) => {
@@ -41,6 +69,7 @@ const resolveRouteName = (route: RouteLocationNormalizedLoaded) => {
 export const useTagsStore = defineStore('tags', () => {
     const visitedViews = ref<VisitedView[]>([])
     const cachedViews = ref<string[]>([])
+    const menuStore = useMenuStore()
 
     const addToCache = (routeName: string) => {
         if (!routeName) return
@@ -68,7 +97,7 @@ export const useTagsStore = defineStore('tags', () => {
         if (route.path === '/login' || route.meta.public) return
 
         const routeName = resolveRouteName(route)
-        const title = resolveTitle(route)
+        const title = resolveTitle(route, menuStore.menuTree)
         const closable = route.path !== HOME_PATH
         const existIndex = visitedViews.value.findIndex((viewItem) => viewItem.path === route.path)
 
@@ -90,6 +119,38 @@ export const useTagsStore = defineStore('tags', () => {
         }
 
         addToCache(routeName)
+    }
+
+    /** 菜单异步加载后，用菜单名刷新已有页签标题 */
+    const refreshTitles = () => {
+        const menuTree = menuStore.menuTree
+        visitedViews.value = visitedViews.value.map((viewItem) => {
+            if (viewItem.path === HOME_PATH) {
+                return {
+                    ...viewItem,
+                    title: findMenuTitleByPath(menuTree, HOME_PATH) || HOME_TITLE,
+                }
+            }
+
+            if (viewItem.path === '/basic/dict-data') {
+                const queryIndex = viewItem.fullPath.indexOf('?')
+                const searchParams = new URLSearchParams(
+                    queryIndex >= 0 ? viewItem.fullPath.slice(queryIndex) : '',
+                )
+                const dictTypeName = searchParams.get('dictTypeName') || searchParams.get('dictType') || ''
+                const baseTitle = findMenuTitleByPath(menuTree, viewItem.path) || '字典数据'
+                return {
+                    ...viewItem,
+                    title: dictTypeName ? `${baseTitle} · ${dictTypeName}` : baseTitle,
+                }
+            }
+
+            const menuTitle = findMenuTitleByPath(menuTree, viewItem.path)
+            return {
+                ...viewItem,
+                title: menuTitle || viewItem.title,
+            }
+        })
     }
 
     const removeVisited = (targetPath: string) => {
@@ -116,6 +177,7 @@ export const useTagsStore = defineStore('tags', () => {
         visitedViews,
         cachedViews,
         addVisited,
+        refreshTitles,
         removeVisited,
         clearAll,
         MAX_CACHE,

@@ -3,10 +3,11 @@
     "compilerOptions": {
         "paths": {
             "@/*": ["./src/*"],
-            "wc-ui": ["../../packages/wc-ui/dist/index.d.ts"],
-            "wc-utils": ["../../packages/wc-utils/dist/index.d.ts"],
-            "wc-basic": ["../../packages/wc-basic/dist/index.d.ts"],
-            "wc-page": ["../../packages/wc-page/dist/index.d.ts"]
+            "wc-ui": ["../../packages/wc-ui/src"],
+            "wc-utils": ["../../packages/wc-utils/src"],
+            "wc-basic": ["../../packages/wc-basic/src"],
+            "wc-page": ["../../packages/wc-page/src"],
+            "wc-theme": ["../../packages/wc-theme/src"]
         }
     }
 }

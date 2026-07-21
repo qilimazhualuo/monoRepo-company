@@ -1,3 +1,9 @@
+<script setup lang="ts">
+import { ThemeProvider } from 'wc-theme'
+</script>
+
 <template>
-    <router-view />
+    <ThemeProvider>
+        <router-view />
+    </ThemeProvider>
 </template>

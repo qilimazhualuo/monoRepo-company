@@ -8,31 +8,7 @@ import { visualizer } from 'rollup-plugin-visualizer'
 import { appBase } from 'vite-plugin-app-base'
 import { sharedChunks } from 'vite-plugin-shared-chunks'
 
-const packagesRoot = resolve(__dirname, '../../packages')
-
-const createWorkspacePackageAliases = (command: string) => (
-    command === 'serve'
-        ? [
-            { find: /^wc-ui$/, replacement: resolve(packagesRoot, 'wc-ui/src') },
-            { find: /^wc-page$/, replacement: resolve(packagesRoot, 'wc-page/src') },
-            { find: /^wc-utils$/, replacement: resolve(packagesRoot, 'wc-utils/src') },
-            { find: /^wc-basic$/, replacement: resolve(packagesRoot, 'wc-basic/src') },
-        ]
-        : []
-)
-
-const injectPackageStyles = (): import('vite').Plugin => ({
-    name: 'inject-package-styles',
-    apply: 'build',
-    enforce: 'pre',
-    transform(code, id) {
-        if (id.includes('/src/main.ts')) {
-            return `import 'wc-ui/style.css'\nimport 'wc-page/style.css'\nimport 'wc-basic/style.css'\n${code}`
-        }
-    },
-})
-
-export default defineConfig(({ command, mode }) => ({
+export default defineConfig(({ mode }) => ({
     plugins: [
         appBase({
             appRoot: __dirname,
@@ -43,9 +19,15 @@ export default defineConfig(({ command, mode }) => ({
         Components({
             resolvers: [AntdvNextResolver()],
             dts: resolve(__dirname, 'src/components.d.ts'),
-            include: [/\.vue$/, /\.vue\?vue/, /packages\/wc-ui\/src/, /packages\/wc-page\/src/, /packages\/wc-basic\/src/],
+            include: [
+                /\.vue$/,
+                /\.vue\?vue/,
+                /packages\/wc-ui\/src/,
+                /packages\/wc-page\/src/,
+                /packages\/wc-basic\/src/,
+                /packages\/wc-theme\/src/,
+            ],
         }),
-        injectPackageStyles(),
         sharedChunks(),
         mode === 'analyze' && visualizer({
             filename: resolve(__dirname, 'stats.html'),
@@ -57,16 +39,20 @@ export default defineConfig(({ command, mode }) => ({
         }),
     ],
     resolve: {
-        alias: [
-            { find: '@', replacement: resolve(__dirname, 'src') },
-            ...createWorkspacePackageAliases(command),
-        ],
+        alias: {
+            '@': resolve(__dirname, 'src'),
+        },
     },
     optimizeDeps: {
-        include: command === 'serve'
-            ? ['vite-plugin-app-base', 'vite-plugin-shared-chunks']
-            : ['wc-basic', 'wc-ui', 'wc-page', 'wc-utils', 'vite-plugin-app-base', 'vite-plugin-shared-chunks'],
-        exclude: command === 'serve' ? ['wc-ui', 'wc-page', 'wc-utils', 'wc-basic'] : [],
+        include: ['vite-plugin-app-base', 'vite-plugin-shared-chunks'],
+        exclude: ['wc-ui', 'wc-page', 'wc-utils', 'wc-basic', 'wc-theme'],
+    },
+    css: {
+        preprocessorOptions: {
+            less: {
+                additionalData: '@import "wc-theme/theme-vars.less";\n',
+            },
+        },
     },
     server: {
         port: 3000,
@@ -79,12 +65,21 @@ export default defineConfig(({ command, mode }) => ({
                 target: 'http://localhost:9001',
                 changeOrigin: true,
             },
+            // 子应用静态资源：前缀 = package.json name，指向各子应用 vite 端口
             '/sub-app': {
                 target: 'http://localhost:3001',
                 changeOrigin: true,
             },
+            '/navigation-front': {
+                target: 'http://localhost:3002',
+                changeOrigin: true,
+            },
+            // 导航后端 API（子应用内 fetch /nav-api/* 时走这里；避免和主应用 /api 冲突）
+            '/nav-api': {
+                target: 'http://localhost:9002',
+                changeOrigin: true,
+                rewrite: (requestPath: string) => requestPath.replace(/^\/nav-api/, '/api'),
+            },
         },
     },
 }))
-
-

@@ -8,31 +8,7 @@ import { visualizer } from 'rollup-plugin-visualizer'
 import { appBase } from 'vite-plugin-app-base'
 import { sharedChunks } from 'vite-plugin-shared-chunks'
 
-const packagesRoot = resolve(__dirname, '../../packages')
-
-const createWorkspacePackageAliases = (command: string) => (
-    command === 'serve'
-        ? [
-            { find: /^wc-ui$/, replacement: resolve(packagesRoot, 'wc-ui/src') },
-            { find: /^wc-page$/, replacement: resolve(packagesRoot, 'wc-page/src') },
-            { find: /^wc-utils$/, replacement: resolve(packagesRoot, 'wc-utils/src') },
-            { find: /^wc-basic$/, replacement: resolve(packagesRoot, 'wc-basic/src') },
-        ]
-        : []
-)
-
-const injectPackageStyles = (): import('vite').Plugin => ({
-    name: 'inject-package-styles',
-    apply: 'build',
-    enforce: 'pre',
-    transform(code, id) {
-        if (id.includes('/src/main.ts')) {
-            return `import 'wc-ui/style.css'\nimport 'wc-page/style.css'\nimport 'wc-basic/style.css'\n${code}`
-        }
-    },
-})
-
-export default defineConfig(({ command, mode }) => ({
+export default defineConfig(({ mode }) => ({
     plugins: [
         appBase({
             appRoot: __dirname,
@@ -43,10 +19,16 @@ export default defineConfig(({ command, mode }) => ({
         Components({
             resolvers: [AntdvNextResolver()],
             dts: resolve(__dirname, 'src/components.d.ts'),
-            include: [/\.vue$/, /\.vue\?vue/, /packages\/wc-ui\/src/, /packages\/wc-page\/src/, /packages\/wc-basic\/src/],
+            include: [
+                /\.vue$/,
+                /\.vue\?vue/,
+                /packages\/wc-ui\/src/,
+                /packages\/wc-page\/src/,
+                /packages\/wc-basic\/src/,
+                /packages\/wc-theme\/src/,
+            ],
         }),
-        injectPackageStyles(),
-        // consumer：引用基座已构建�?/shared/*，须�?yarn build:main
+        // consumer：引用基座已构建的 /shared/*，须先 yarn build:main
         sharedChunks({ role: 'consumer' }),
         mode === 'analyze' && visualizer({
             filename: resolve(__dirname, 'stats.html'),
@@ -58,16 +40,20 @@ export default defineConfig(({ command, mode }) => ({
         }),
     ],
     resolve: {
-        alias: [
-            { find: '@', replacement: resolve(__dirname, 'src') },
-            ...createWorkspacePackageAliases(command),
-        ],
+        alias: {
+            '@': resolve(__dirname, 'src'),
+        },
     },
     optimizeDeps: {
-        include: command === 'serve'
-            ? ['vite-plugin-app-base', 'vite-plugin-shared-chunks']
-            : ['wc-basic', 'wc-ui', 'wc-page', 'wc-utils', 'vite-plugin-app-base', 'vite-plugin-shared-chunks'],
-        exclude: command === 'serve' ? ['wc-ui', 'wc-page', 'wc-utils', 'wc-basic'] : [],
+        include: ['vite-plugin-app-base', 'vite-plugin-shared-chunks'],
+        exclude: ['wc-ui', 'wc-page', 'wc-utils', 'wc-basic', 'wc-theme'],
+    },
+    css: {
+        preprocessorOptions: {
+            less: {
+                additionalData: '@import "wc-theme/theme-vars.less";\n',
+            },
+        },
     },
     server: {
         port: 3001,
@@ -87,5 +73,3 @@ export default defineConfig(({ command, mode }) => ({
         },
     },
 }))
-
-

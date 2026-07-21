@@ -1,0 +1,39 @@
+{
+    "name": "wc-theme",
+    "version": "0.0.1",
+    "private": true,
+    "type": "module",
+    "main": "./src/index.ts",
+    "module": "./src/index.ts",
+    "types": "./src/index.ts",
+    "files": [
+        "src",
+        "dist"
+    ],
+    "exports": {
+        ".": {
+            "types": "./src/index.ts",
+            "import": "./src/index.ts",
+            "default": "./src/index.ts"
+        },
+        "./theme-vars.less": "./src/styles/theme-vars.less"
+    },
+    "scripts": {
+        "build": "vite build"
+    },
+    "sideEffects": [
+        "**/*.css",
+        "**/*.less",
+        "**/*.vue"
+    ],
+    "peerDependencies": {
+        "antdv-next": "^1.3.5",
+        "pinia": "^2.3.0",
+        "vue": "^3.5.13"
+    },
+    "dependencies": {
+        "antdv-next": "^1.3.5",
+        "pinia": "^2.3.0",
+        "vue": "^3.5.13"
+    }
+}

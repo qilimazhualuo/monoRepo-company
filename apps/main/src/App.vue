@@ -1,15 +1,20 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { bus } from 'wujie'
 import type { MenuItem } from 'wc-utils'
 import { AppLogo } from 'wc-ui'
+import {
+    ThemeProvider,
+    ThemeSwitcher,
+    useThemeStore,
+    isDarkThemeKey,
+    THEME_CHANGE_EVENT,
+} from 'wc-theme'
 import { useUserStore } from '@/stores/user'
 import { useMenuStore } from '@/stores/menu'
 import { useTagsStore } from '@/stores/tags'
 import TagsView from '@/components/TagsView.vue'
-import ThemeProvider from '@/components/ThemeProvider.vue'
-import ThemeSwitcher from '@/components/ThemeSwitcher.vue'
-import { useThemeStore } from '@/stores/theme'
 
 type AntdMenuItem = {
     key: string
@@ -27,9 +32,7 @@ const themeStore = useThemeStore()
 const openKeys = ref<string[]>([])
 
 const isLoginPage = computed(() => route.path === '/login')
-const isDarkTheme = computed(() => (
-    themeStore.currentTheme === 'dark' || themeStore.currentTheme === 'geek'
-))
+const isDarkTheme = computed(() => isDarkThemeKey(themeStore.currentTheme))
 
 const findMenuByPath = (items: MenuItem[], targetPath: string): MenuItem | undefined => {
     for (const item of items) {
@@ -110,6 +113,13 @@ watch(
     { immediate: true, deep: true },
 )
 
+watch(
+    () => themeStore.currentTheme,
+    (themeKey) => {
+        bus.$emit(THEME_CHANGE_EVENT, themeKey)
+    },
+)
+
 const handleMenuClick = (info: { key: string | number }) => {
     const menuId = Number(String(info.key).replace('menu-', ''))
     if (Number.isNaN(menuId)) return
@@ -161,7 +171,12 @@ const handleLogout = async () => {
                 <a-layout-content class="main-app__content">
                     <router-view v-slot="{ Component }">
                         <keep-alive :max="tagsStore.MAX_CACHE" :include="tagsStore.cachedViews">
-                            <component :is="Component" :key="route.path" />
+                            <component
+                                :is="Component"
+                                :key="route.name === 'sub-app'
+                                    ? (route.path.split('/').filter(Boolean)[0] || 'sub-app')
+                                    : route.path"
+                            />
                         </keep-alive>
                     </router-view>
                 </a-layout-content>
@@ -171,8 +186,6 @@ const handleLogout = async () => {
 </template>
 
 <style lang="less" scoped>
-@import '@/styles/theme-vars.less';
-
 .main-app {
     min-height: 100vh;
     background: @app-color-bg-layout;

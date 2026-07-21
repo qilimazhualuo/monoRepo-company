@@ -1,64 +1,66 @@
 <script setup lang="ts">
 defineOptions({ name: 'sub-app' })
 
-import { ref, computed, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { bus } from 'wujie'
 import { WcWujie } from 'wc-ui'
-
-/** 须与 apps/sub-app/package.json 的 name 一致 */
-const subAppName = 'sub-app'
-
-const subAppUrl = import.meta.env.DEV
-    ? '/sub-app/'
-    : `/${subAppName}/`
+import { useThemeStore } from 'wc-theme'
 
 const route = useRoute()
+const themeStore = useThemeStore()
 const subAppReady = ref(false)
+const readyAppName = ref('')
 
-const subAppPath = computed(() => {
-    const match = route.params.pathMatch
-    return Array.isArray(match) ? `/${match.join('/')}` : (match ? `/${match}` : '/')
+const pathSegments = computed(() => route.path.split('/').filter(Boolean))
+
+const appName = computed(() => pathSegments.value[0] ?? '')
+
+/** 去掉项目前缀后的子应用内部路径 */
+const childPath = computed(() => {
+    const restSegments = pathSegments.value.slice(1)
+    return restSegments.length ? `/${restSegments.join('/')}` : '/'
 })
 
+const appUrl = computed(() => `/${appName.value}/`)
+
 const emitRoute = (path: string) => {
-    bus.$emit(`${subAppName}-route-change`, path)
+    if (!appName.value) {
+        return
+    }
+    bus.$emit(`${appName.value}-route-change`, path)
 }
 
-watch(subAppPath, (path) => {
-    if (subAppReady.value) {
+watch(childPath, (path) => {
+    if (subAppReady.value && readyAppName.value === appName.value) {
         emitRoute(path)
     }
 })
 
+watch(appName, () => {
+    subAppReady.value = false
+    readyAppName.value = ''
+})
+
 const handleSubAppReady = () => {
     subAppReady.value = true
-    emitRoute(subAppPath.value)
+    readyAppName.value = appName.value
+    emitRoute(childPath.value)
 }
 </script>
 
 <template>
-    <div class="sub-app-container">
-        <WcWujie
-            :name="subAppName"
-            :url="subAppUrl"
-            :sync="false"
-            alive
-            :props="{ initialPath: subAppPath }"
-            @load="handleSubAppReady"
-        />
-    </div>
+    <WcWujie
+        v-if="appName"
+        :key="appName"
+        :name="appName"
+        :url="appUrl"
+        :sync="false"
+        alive
+        :props="{
+            initialPath: childPath,
+            themeKey: themeStore.currentTheme,
+        }"
+        @load="handleSubAppReady"
+    />
 </template>
-
-<style lang="less" scoped>
-@import '@/styles/theme-vars.less';
-
-.sub-app-container {
-    background: @app-color-bg-container;
-    border-radius: @app-border-radius-lg;
-    box-shadow: @app-box-shadow;
-    border: 1px solid @app-color-border-secondary;
-    overflow: hidden;
-    min-height: 500px;
-}
-</style>

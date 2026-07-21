@@ -95,8 +95,6 @@ onMounted(() => {
 </template>
 
 <style lang="less" scoped>
-@import '@/styles/theme-vars.less';
-
 .login-page {
     display: flex;
     align-items: center;

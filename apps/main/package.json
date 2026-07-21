@@ -15,6 +15,7 @@
         "vue-router": "^4.5.0",
         "wc-basic": "0.0.1",
         "wc-page": "0.0.1",
+        "wc-theme": "0.0.1",
         "wc-ui": "0.0.1",
         "wc-utils": "0.0.1",
         "wujie": "^2.1.0"

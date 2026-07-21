@@ -1,0 +1,11 @@
+{
+    "extends": "./tsconfig.json",
+    "compilerOptions": {
+        "paths": {
+            "@/*": ["./src/*"],
+            "map": ["../../packages/map/index.js"],
+            "wc-theme": ["../../packages/wc-theme/src"],
+            "wc-utils": ["../../packages/wc-utils/src"]
+        }
+    }
+}
