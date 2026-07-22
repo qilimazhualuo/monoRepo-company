@@ -19,3 +19,6 @@
 [submodule "packages/map"]
 	path = packages/map
 	url = https://github.com/qilimazhualuo/map.git
+[submodule "packages/wc-theme"]
+	path = packages/wc-theme
+	url = https://github.com/qilimazhualuo/wc-theme.git
