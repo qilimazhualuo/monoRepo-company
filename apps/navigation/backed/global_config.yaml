@@ -1,0 +1,15 @@
+DEBUG: true
+
+DATABASE:
+    DB_USER: postgres
+    DB_PASSWORD: 123zhangbei
+    DB_HOST: 127.0.0.1
+    DB_PORT: 5432
+    DB_NAME: navigation
+
+ROUTING:
+    BUFFER_DEG: 0.15
+    MAX_BUFFER_DEG: 0.8
+    BUFFER_STEP_DEG: 0.15
+    SNAP_TOLERANCE_M: 500
+    AVG_SPEED_KMH: 40

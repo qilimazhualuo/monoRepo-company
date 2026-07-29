@@ -3,10 +3,11 @@ import { createApp, type App as VueApp } from 'vue'
 import { createPinia } from 'pinia'
 import { isThemeKey, THEME_CHANGE_EVENT, useThemeStore } from 'wc-theme'
 import App from './App.vue'
-import router from './router'
 import './styles/index.less'
 
 patchAntdvDynamicCss()
+
+const APP_NAME = 'navigation-front'
 
 let appInstance: VueApp | null = null
 
@@ -21,22 +22,9 @@ const applyThemeFromHost = () => {
 const mountApp = () => {
     appInstance = createApp(App)
     appInstance.use(createPinia())
-    appInstance.use(router)
     appInstance.mount('#app')
-
     applyThemeFromHost()
 
-    // 挂载后导航到主应用传入的初始路由
-    if (window.$wujie?.props?.initialPath) {
-        router.push(window.$wujie.props.initialPath as string)
-    }
-
-    // 监听主应用后续路由切换
-    window.$wujie?.bus?.$on('sub-app-route-change', (path: unknown) => {
-        router.push(path as string)
-    })
-
-    // 监听主应用主题切换
     window.$wujie?.bus?.$on(THEME_CHANGE_EVENT, (themeKey: unknown) => {
         if (typeof themeKey === 'string' && isThemeKey(themeKey)) {
             useThemeStore().setTheme(themeKey)
@@ -45,7 +33,7 @@ const mountApp = () => {
 }
 
 const unmountApp = () => {
-    window.$wujie?.bus?.$off('sub-app-route-change')
+    window.$wujie?.bus?.$off(`${APP_NAME}-route-change`)
     window.$wujie?.bus?.$off(THEME_CHANGE_EVENT)
     appInstance?.unmount()
     appInstance = null

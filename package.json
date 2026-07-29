@@ -3,6 +3,7 @@
     "private": true,
     "workspaces": [
         "apps/*",
+        "apps/*/*",
         "packages/*",
         "plugins/*",
         "server/*"
@@ -16,6 +17,9 @@
         "dev:nav-server": "yarn workspace server-navigation run dev",
         "dev:nav": "yarn workspace navigation-front run dev",
         "dev:navigation": "node scripts/run-workspaces.mjs --names server-navigation,navigation-front --script dev",
+        "dev:tif-server": "yarn workspace server-tif-load run dev",
+        "dev:tif": "yarn workspace tif-load-front run dev",
+        "dev:tif-load": "node scripts/run-workspaces.mjs --names server-tif-load,tif-load-front --script dev",
         "build:packages": "node scripts/build-packages.mjs",
         "build": "yarn build:packages && yarn build:all && node scripts/merge-dist.mjs",
         "build:all": "node scripts/build-all.mjs",
