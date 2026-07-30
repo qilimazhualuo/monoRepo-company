@@ -75,7 +75,7 @@ const loadTerrainToMap = async (fileId: string) => {
     try {
         if (mapMode.value !== 3) {
             await new Promise<void>((resolve) => {
-                map.switchMode(3, {
+                map.mode.switchMode(3, {
                     keepView: true,
                     callback: () => {
                         mapMode.value = 3
@@ -87,10 +87,10 @@ const loadTerrainToMap = async (fileId: string) => {
 
         const meta = await fetchHeightmapMeta(fileId)
         const heightmapBuffer = await fetchHeightmapBin(fileId)
-        if (typeof map.loadHeightmapTerrain !== 'function') {
+        if (typeof map.baseLayer.loadHeightmapTerrain !== 'function') {
             throw new Error('当前 map 引擎未接入 loadHeightmapTerrain（请确认 packages/map3）')
         }
-        const result = map.loadHeightmapTerrain({
+        const result = map.baseLayer.loadHeightmapTerrain({
             meta: {
                 ...meta,
                 tile_size: meta.tileSize,
@@ -102,7 +102,7 @@ const loadTerrainToMap = async (fileId: string) => {
         if (result.code !== 0) {
             throw new Error(result.msg || '地形加载失败')
         }
-        map.setCenter(
+        map.baseLayer.setCenter(
             [
                 [meta.west, meta.south],
                 [meta.east, meta.south],
@@ -131,7 +131,7 @@ const switchMapMode = (nextMode: MapMode) => {
     if (!map || nextMode === mapMode.value) {
         return
     }
-    map.switchMode(nextMode, {
+    map.mode.switchMode(nextMode, {
         keepView: true,
         callback: () => {
             mapMode.value = nextMode
@@ -153,7 +153,7 @@ const initMap = () => {
         mode: mapMode.value,
         mapType: 'gaode',
         callback: () => {
-            map.loadMap({ mapType: 'gaode' })
+            map.baseLayer.loadMap({ mapType: 'gaode' })
             statusText.value = '地图就绪'
         },
     })
@@ -166,7 +166,7 @@ onMounted(async () => {
 })
 
 onBeforeUnmount(() => {
-    mapInstance.value?.destroy()
+    mapInstance.value?.mode.destroy()
     mapInstance.value = null
 })
 </script>

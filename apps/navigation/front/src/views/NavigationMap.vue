@@ -67,10 +67,10 @@ const redrawMarkersAndRoute = () => {
         return
     }
 
-    map.clearLayer(LAYER_ID)
+    map.layer.clearLayer(LAYER_ID)
 
     if (hasStart.value) {
-        map.createPoint({
+        map.geometry.createPoint({
             longitude: startPoint.longitude as number,
             latitude: startPoint.latitude as number,
             fill: '#52c41a',
@@ -82,7 +82,7 @@ const redrawMarkersAndRoute = () => {
     }
 
     if (hasEnd.value) {
-        map.createPoint({
+        map.geometry.createPoint({
             longitude: endPoint.longitude as number,
             latitude: endPoint.latitude as number,
             fill: '#ff4d4f',
@@ -94,7 +94,7 @@ const redrawMarkersAndRoute = () => {
     }
 
     if (routeResult.value?.coords?.length) {
-        map.createLine({
+        map.geometry.createLine({
             layerId: LAYER_ID,
             data: routeResult.value.coords,
             style: {
@@ -170,7 +170,7 @@ const startMeasure = (type: Exclude<MeasureType, null>) => {
 
     pickMode.value = null
     measureType.value = type
-    map.draw(type, {}, false)
+    map.measure.draw(type, {}, false)
     message.info(`开始${measureTypeLabel[type]}，在地图上点击绘制`)
 }
 
@@ -180,7 +180,7 @@ const stopMeasure = () => {
         measureType.value = null
         return
     }
-    map.stopMeasure()
+    map.measure.stopMeasure()
     measureType.value = null
 }
 
@@ -189,14 +189,14 @@ const clearMeasure = () => {
     if (!map) {
         return
     }
-    map.stopMeasure()
-    map.clearMeasure()
+    map.measure.stopMeasure()
+    map.measure.clearMeasure()
     measureType.value = null
     message.success('已清除测量')
 }
 
 const bindMeasureCallback = (map: any) => {
-    map.setMeasureCallBack(() => {
+    map.measure.setMeasureCallBack(() => {
         measureType.value = null
         message.success('测量完成')
     })
@@ -279,11 +279,11 @@ const bindMapReady = () => {
     if (!map) {
         return
     }
-    map.createLayer({
+    map.layer.createLayer({
         id: LAYER_ID,
         zIndex: 20,
     })
-    map.addEvent('click', handleMapClick)
+    map.event.addEvent('click', handleMapClick)
     bindMeasureCallback(map)
     redrawMarkersAndRoute()
 }
@@ -295,7 +295,7 @@ const switchMapMode = (nextMode: MapMode) => {
     }
 
     measureType.value = null
-    map.switchMode(nextMode, {
+    map.mode.switchMode(nextMode, {
         keepView: true,
         callback: () => {
             mapMode.value = nextMode
@@ -333,8 +333,8 @@ onMounted(async () => {
 })
 
 onBeforeUnmount(() => {
-    mapInstance.value?.removeEvent('click', handleMapClick)
-    mapInstance.value?.destroy()
+    mapInstance.value?.event.removeEvent('click', handleMapClick)
+    mapInstance.value?.mode.destroy()
     mapInstance.value = null
 })
 </script>
