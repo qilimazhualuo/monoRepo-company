@@ -57,7 +57,7 @@ declare module 'map' {
             zoom?: number
             mode?: 2 | 3
             mapType?: string
-            baseLayerConfig?: Array<{ mapType: string; token?: string; tiandituKey?: string }>
+            baseLayerConfig?: Array<{ mapType: string; token?: string; tileType?: string; url?: string }>
             tiandituKey?: string
             callback?: (engine: unknown) => void
         })
@@ -74,6 +74,22 @@ declare module 'map' {
         createLine: (params: CreateLineParams) => { code: number; data?: string; msg?: string }
         addEvent: (type: string, handler: (payload: MapClickPayload) => void, layerId?: string) => void
         removeEvent: (type?: string, handler?: Function, layerId?: string) => void
+        setVisible: (
+            config: { mapType?: string; token?: string; tileType?: string; url?: string },
+            visible?: boolean,
+        ) => void
+        onVisibleChange: (
+            callback: (payload: {
+                config: { mapType?: string; token?: string; tileType?: string; url?: string }
+                visible: boolean
+            }) => void,
+        ) => () => void
+        offVisibleChange: (
+            callback: (payload: {
+                config: { mapType?: string; token?: string; tileType?: string; url?: string }
+                visible: boolean
+            }) => void,
+        ) => void
         destroy: () => void
     }
 }

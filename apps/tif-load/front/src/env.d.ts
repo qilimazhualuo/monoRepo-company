@@ -35,7 +35,7 @@ declare module 'map' {
             zoom?: number
             mode?: 2 | 3
             mapType?: string
-            baseLayerConfig?: Array<{ mapType: string; token?: string; tiandituKey?: string }>
+            baseLayerConfig?: Array<{ mapType: string; token?: string; tileType?: string; url?: string }>
             tiandituKey?: string
             callback?: (engine: unknown) => void
         })

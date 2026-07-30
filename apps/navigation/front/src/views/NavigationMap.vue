@@ -180,7 +180,7 @@ const stopMeasure = () => {
         measureType.value = null
         return
     }
-    map.stopMeature()
+    map.stopMeasure()
     measureType.value = null
 }
 
@@ -189,14 +189,14 @@ const clearMeasure = () => {
     if (!map) {
         return
     }
-    map.stopMeature()
-    map.clearMeature()
+    map.stopMeasure()
+    map.clearMeasure()
     measureType.value = null
     message.success('已清除测量')
 }
 
 const bindMeasureCallback = (map: any) => {
-    map.setMeatureCallBack(() => {
+    map.setMeasureCallBack(() => {
         measureType.value = null
         message.success('测量完成')
     })
@@ -315,7 +315,10 @@ const initMap = () => {
             center: DEFAULT_CENTER,
             zoom: DEFAULT_ZOOM,
             mode: mapMode.value,
-            baseLayerConfig: [{ mapType: 'tianditu', token: import.meta.env.VITE_TIANDITU_KEY }, { mapType: 'gaode' }],
+            baseLayerConfig: [
+                { mapType: 'tianditu', token: import.meta.env.VITE_TIANDITU_KEY, tileType: 'vec_w' },
+                { mapType: 'tianditu', token: import.meta.env.VITE_TIANDITU_KEY, tileType: 'cva_w' },
+            ],
             callback: () => {
                 bindMapReady()
             },
