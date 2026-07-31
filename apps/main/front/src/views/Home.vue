@@ -22,7 +22,7 @@ const currentTime = computed(() => formatDate(new Date()))
 
         <div class="home__card">
             <p class="home__desc">
-                点击顶部导航「子应用」可加载微前端子应用。基础依赖与公共模块统一由 packages 管理。
+                顶部导航可直接进入菜单；点击标签页可快速切换最近访问。基础依赖与公共模块统一由 packages 管理。
             </p>
 
             <a-descriptions bordered :column="1" size="small">

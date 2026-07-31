@@ -6,6 +6,14 @@ import { useRoute, useRouter } from 'vue-router'
 import { useTagsStore } from '@/stores/tags'
 import { useMenuStore } from '@/stores/menu'
 
+type TagsDirection = 'horizontal' | 'vertical'
+
+const props = withDefaults(defineProps<{
+    direction?: TagsDirection
+}>(), {
+    direction: 'horizontal',
+})
+
 const route = useRoute()
 const router = useRouter()
 const tagsStore = useTagsStore()
@@ -58,7 +66,10 @@ const handleTagClose = (event: Event, targetPath: string) => {
 </script>
 
 <template>
-    <div class="tags-view">
+    <div
+        class="tags-view"
+        :class="`tags-view--${props.direction}`"
+    >
         <button
             v-for="viewItem in tagsStore.visitedViews"
             :key="viewItem.path"
@@ -79,32 +90,73 @@ const handleTagClose = (event: Event, targetPath: string) => {
 
 <style lang="less" scoped>
 .tags-view {
-    flex: 1;
     display: flex;
-    align-items: center;
     gap: 6px;
     min-width: 0;
-    overflow-x: auto;
     padding: 4px 0;
 
-    &::-webkit-scrollbar {
-        height: 4px;
+    &--horizontal {
+        flex: 1;
+        flex-direction: row;
+        align-items: center;
+        overflow-x: auto;
+
+        &::-webkit-scrollbar {
+            height: 4px;
+        }
+
+        &::-webkit-scrollbar-thumb {
+            background: @app-color-fill-secondary;
+            border-radius: 2px;
+        }
+
+        .tags-view__tag {
+            flex-shrink: 0;
+            border-radius: @app-border-radius @app-border-radius 0 0;
+
+            &--active {
+                border-bottom-color: @app-color-bg-container;
+                box-shadow: inset 0 -2px 0 @app-color-primary;
+            }
+        }
+
+        .tags-view__text {
+            max-width: 120px;
+        }
     }
 
-    &::-webkit-scrollbar-thumb {
-        background: @app-color-fill-secondary;
-        border-radius: 2px;
+    &--vertical {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 4px;
+        overflow: visible;
+        padding: 0;
+
+        .tags-view__tag {
+            justify-content: space-between;
+            height: 32px;
+            border-radius: @app-border-radius;
+
+            &--active {
+                border-bottom-color: @app-color-primary;
+                box-shadow: none;
+            }
+        }
+
+        .tags-view__text {
+            flex: 1;
+            max-width: none;
+            text-align: left;
+        }
     }
 
     &__tag {
         display: inline-flex;
         align-items: center;
         gap: 4px;
-        flex-shrink: 0;
         height: 28px;
         padding: 0 10px;
         border: 1px solid @app-color-border;
-        border-radius: @app-border-radius @app-border-radius 0 0;
         background: @app-color-fill-secondary;
         color: @app-color-text-secondary;
         font-size: 13px;
@@ -120,13 +172,10 @@ const handleTagClose = (event: Event, targetPath: string) => {
             color: @app-color-primary;
             background: @app-color-bg-container;
             border-color: @app-color-primary;
-            border-bottom-color: @app-color-bg-container;
-            box-shadow: inset 0 -2px 0 @app-color-primary;
         }
     }
 
     &__text {
-        max-width: 120px;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
