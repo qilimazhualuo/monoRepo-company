@@ -327,6 +327,7 @@ export const sharedChunks = (options = {}) => {
         const normalizedId = fileId.replace(/\\/g, "/").split("?")[0];
         return normalizedId.endsWith("/src/main.ts");
     };
+    /** @type {import('vite').Plugin} */
     const producerSurfacePlugin = {
         name: "vite-plugin-shared-chunks-surface",
         apply: "build",
@@ -390,6 +391,7 @@ ${code}`,
             }
         };
     };
+    /** @type {import('vite').Plugin} */
     const sharedChunksPlugin = {
         name: "vite-plugin-shared-chunks",
         apply: "build",

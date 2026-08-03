@@ -74,20 +74,29 @@ export default defineConfig(({ mode }) => ({
                 target: 'http://localhost:3002',
                 changeOrigin: true,
             },
-            '/tif-load-front': {
-                target: 'http://localhost:3003',
-                changeOrigin: true,
-            },
             // 导航后端 API（子应用内 fetch /nav-api/* 时走这里；避免和主应用 /api 冲突）
             '/nav-api': {
                 target: 'http://localhost:9004',
                 changeOrigin: true,
                 rewrite: (requestPath: string) => requestPath.replace(/^\/nav-api/, '/api'),
             },
+            '/tif-load-front': {
+                target: 'http://localhost:3003',
+                changeOrigin: true,
+            },
             '/tif-api': {
                 target: 'http://localhost:9003',
                 changeOrigin: true,
                 rewrite: (requestPath: string) => requestPath.replace(/^\/tif-api/, '/api'),
+            },
+            '/cad2map-front': {
+                target: 'http://localhost:3005',
+                changeOrigin: true,
+            },
+            '/cad2map-api': {
+                target: 'http://localhost:8080',
+                changeOrigin: true,
+                rewrite: (requestPath: string) => requestPath.replace(/^\/cad2map-api/, ''),
             },
         },
     },

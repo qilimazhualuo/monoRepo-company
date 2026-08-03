@@ -10,6 +10,7 @@ import { spawn, spawnSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import readline from 'node:readline'
 
 const monorepoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 
@@ -258,20 +259,49 @@ const childRecords = []
 let shuttingDown = false
 let exitedCount = 0
 let finishedCount = 0
+/** @type {((value?: void) => void) | null} */
+let resolveAllFinished = null
 
-const tryExitMain = () => {
+const allChildrenFinished = () => new Promise((resolve) => {
+    if (finishedCount >= childRecords.length) {
+        resolve()
+        return
+    }
+    resolveAllFinished = resolve
+})
+
+const notifyChildFinished = () => {
     if (finishedCount < childRecords.length) return
-    console.log('[run-workspaces] 全部子进程已关闭，主进程退出')
-    process.exit(0)
+    if (resolveAllFinished) {
+        const resolve = resolveAllFinished
+        resolveAllFinished = null
+        resolve()
+    }
 }
 
-const shutdown = (reason) => {
+const flushStdout = () => new Promise((resolve) => {
+    process.stdout.write('', () => resolve())
+})
+
+const markChildFinished = (childRecord, exitText) => {
+    if (childRecord.finished) return false
+    childRecord.finished = true
+    finishedCount += 1
+    if (exitText) {
+        console.log(`[run-workspaces] ${childRecord.label} 已结束 (${exitText})`)
+    }
+    notifyChildFinished()
+    return true
+}
+
+const shutdown = async (reason) => {
     if (shuttingDown) return
     shuttingDown = true
     console.log(`\n[run-workspaces] ${reason}，先结束全部子进程，再退出主进程…`)
 
     if (childRecords.length === 0) {
         console.log('[run-workspaces] 无子进程，主进程退出')
+        await flushStdout()
         process.exit(0)
         return
     }
@@ -290,7 +320,8 @@ const shutdown = (reason) => {
         }
     }
 
-    setTimeout(() => {
+    // 不能 unref：必须撑住事件循环，等子进程全部退出再让主进程走人
+    const forceKillTimer = setTimeout(() => {
         for (const childRecord of childRecords) {
             if (childRecord.finished) continue
             console.log(`[run-workspaces] ${childRecord.label} 超时未退出，强制结束…`)
@@ -299,22 +330,50 @@ const shutdown = (reason) => {
                 killProcessTree(childRecord.childProcess.pid)
             }
         }
-    }, 2000).unref()
+    }, 2000)
 
-    setTimeout(() => {
+    const forceMarkTimer = setTimeout(() => {
         for (const childRecord of childRecords) {
             if (childRecord.finished) continue
-            childRecord.finished = true
-            finishedCount += 1
             console.log(`[run-workspaces] ${childRecord.label} 强制标记为已结束`)
+            markChildFinished(childRecord, null)
         }
-        tryExitMain()
-    }, 5000).unref()
+    }, 5000)
+
+    await allChildrenFinished()
+    clearTimeout(forceKillTimer)
+    clearTimeout(forceMarkTimer)
+
+    console.log('[run-workspaces] 全部子进程已关闭，主进程退出')
+    await flushStdout()
+    process.exit(0)
 }
 
-process.on('SIGINT', () => shutdown('收到 Ctrl+C'))
-process.on('SIGTERM', () => shutdown('收到 SIGTERM'))
-process.on('SIGHUP', () => shutdown('收到 SIGHUP'))
+const bindShutdownSignals = () => {
+    // 占住 stdin，避免 Windows 控制台 Ctrl+C 时 shell 提前吐提示符、日志糊成一团
+    if (process.stdin.isTTY) {
+        process.stdin.resume()
+        const readlineInterface = readline.createInterface({
+            input: process.stdin,
+            output: process.stdout,
+        })
+        readlineInterface.on('SIGINT', () => {
+            void shutdown('收到 Ctrl+C')
+        })
+    }
+
+    process.on('SIGINT', () => {
+        void shutdown('收到 Ctrl+C')
+    })
+    process.on('SIGTERM', () => {
+        void shutdown('收到 SIGTERM')
+    })
+    process.on('SIGHUP', () => {
+        void shutdown('收到 SIGHUP')
+    })
+}
+
+bindShutdownSignals()
 
 for (const target of targets) {
     // Windows：shell 必须开（Node 20+ 禁裸 spawn .cmd，否则 EINVAL），
@@ -345,40 +404,37 @@ for (const target of targets) {
     pipeWithPrefix(target.label, childProcess.stderr, process.stderr)
 
     childProcess.on('exit', (exitCode, signalName) => {
-        if (childRecord.finished) return
-        childRecord.finished = true
-        finishedCount += 1
-
         const exitText = signalName
             ? `signal=${signalName}`
             : `code=${exitCode ?? 0}`
 
         if (shuttingDown) {
-            console.log(`[run-workspaces] ${target.label} 已结束 (${exitText})`)
-            tryExitMain()
+            markChildFinished(childRecord, exitText)
             return
         }
+
+        if (!markChildFinished(childRecord, null)) return
 
         exitedCount += 1
         console.log(`[run-workspaces] ${target.label} 退出 (${exitText})`)
 
         if (exitCode !== 0 || signalName) {
-            shutdown(`${target.label} 异常退出`)
+            void shutdown(`${target.label} 异常退出`)
             return
         }
 
         if (exitedCount >= childRecords.length) {
-            console.log('[run-workspaces] 全部子进程正常结束，主进程退出')
-            process.exit(0)
+            void (async () => {
+                console.log('[run-workspaces] 全部子进程正常结束，主进程退出')
+                await flushStdout()
+                process.exit(0)
+            })()
         }
     })
 
     childProcess.on('error', (error) => {
         console.error(`[run-workspaces] failed to start ${target.packageName}:`, error)
-        if (!childRecord.finished) {
-            childRecord.finished = true
-            finishedCount += 1
-        }
-        shutdown('启动子进程失败')
+        markChildFinished(childRecord, null)
+        void shutdown('启动子进程失败')
     })
 }

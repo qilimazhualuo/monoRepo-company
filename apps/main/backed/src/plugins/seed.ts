@@ -30,6 +30,7 @@ const defaultMenus = [
     { parentKey: 'sub-app', key: 'sub-app-home', name: '子应用首页', type: 'menu', path: '/sub-app', permission: null, sort: 1 },
     { parentKey: 'sub-app', key: 'sub-app-about', name: '关于', type: 'menu', path: '/sub-app/about', permission: null, sort: 2 },
     { parentKey: 'sub-app', key: 'tif-load', name: 'TIF 加载', type: 'menu', path: '/tif-load-front', permission: null, sort: 3 },
+    { parentKey: 'sub-app', key: 'cad2map', name: 'CAD 上图', type: 'menu', path: '/cad2map-front', permission: null, sort: 4 },
 ] as const
 
 const defaultDictTypes = [
