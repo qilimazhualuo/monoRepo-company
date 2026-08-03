@@ -19,6 +19,12 @@
 [submodule "packages/map"]
 	path = packages/map
 	url = https://github.com/qilimazhualuo/map.git
+[submodule "packages/map-ui"]
+	path = packages/map-ui
+	url = https://github.com/qilimazhualuo/map-ui.git
 [submodule "packages/wc-theme"]
 	path = packages/wc-theme
 	url = https://github.com/qilimazhualuo/wc-theme.git
+[submodule "apps/cad2map"]
+	path = apps/cad2map
+	url = https://github.com/qilimazhualuo/cad2map.git
