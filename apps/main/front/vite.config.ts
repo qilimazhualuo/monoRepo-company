@@ -98,6 +98,15 @@ export default defineConfig(({ mode }) => ({
                 changeOrigin: true,
                 rewrite: (requestPath: string) => requestPath.replace(/^\/cad2map-api/, ''),
             },
+            '/models-front': {
+                target: 'http://localhost:3006',
+                changeOrigin: true,
+            },
+            '/models-api': {
+                target: 'http://localhost:9010',
+                changeOrigin: true,
+                rewrite: (requestPath: string) => requestPath.replace(/^\/models-api/, ''),
+            },
         },
     },
 }))
