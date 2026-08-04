@@ -28,3 +28,6 @@
 [submodule "apps/cad2map"]
 	path = apps/cad2map
 	url = https://github.com/qilimazhualuo/cad2map.git
+[submodule "apps/models"]
+	path = apps/models
+	url = https://github.com/qilimazhualuo/models.git
