@@ -94,7 +94,7 @@ export default defineConfig(({ mode }) => ({
                 changeOrigin: true,
             },
             '/cad2map-api': {
-                target: 'http://localhost:8080',
+                target: 'http://localhost:9009',
                 changeOrigin: true,
                 rewrite: (requestPath: string) => requestPath.replace(/^\/cad2map-api/, ''),
             },

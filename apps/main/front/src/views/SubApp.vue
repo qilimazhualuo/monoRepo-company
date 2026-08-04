@@ -62,6 +62,7 @@ const handleSubAppReady = () => {
         :url="appUrl"
         :sync="false"
         :alive="true"
+        :auto-destroy="false"
         :props="wujieProps"
         class="sub-app"
         @load="handleSubAppReady"

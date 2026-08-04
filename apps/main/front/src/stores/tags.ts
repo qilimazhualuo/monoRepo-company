@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import type { RouteLocationNormalizedLoaded } from 'vue-router'
+import { destroyApp } from 'wujie'
 import type { MenuItem } from 'wc-utils'
 import { useMenuStore } from '@/stores/menu'
 
@@ -64,6 +65,20 @@ const resolveRouteName = (route: RouteLocationNormalizedLoaded) => {
         return route.name
     }
     return ''
+}
+
+/** 子应用路由首段作为 wujie name，例如 /cad2map/xxx → cad2map */
+const resolveSubAppName = (path: string) => {
+    const firstSegment = path.split('/').filter(Boolean)[0]
+    return firstSegment || ''
+}
+
+const hasOtherSubAppTags = (views: VisitedView[], appName: string, excludePath: string) => {
+    return views.some((viewItem) => {
+        if (viewItem.path === excludePath) return false
+        if (viewItem.name !== 'sub-app') return false
+        return resolveSubAppName(viewItem.path) === appName
+    })
 }
 
 export const useTagsStore = defineStore('tags', () => {
@@ -161,6 +176,14 @@ export const useTagsStore = defineStore('tags', () => {
         const [removedView] = visitedViews.value.splice(viewIndex, 1)
         if (removedView) {
             removeFromCache(removedView.name)
+
+            // 该子应用已无页签时销毁无界实例，避免 alive 泄漏
+            if (removedView.name === 'sub-app') {
+                const subAppName = resolveSubAppName(removedView.path)
+                if (subAppName && !hasOtherSubAppTags(visitedViews.value, subAppName, removedView.path)) {
+                    destroyApp(subAppName)
+                }
+            }
         }
 
         return {
@@ -170,6 +193,14 @@ export const useTagsStore = defineStore('tags', () => {
     }
 
     const clearAll = () => {
+        const subAppNames = new Set(
+            visitedViews.value
+                .filter((viewItem) => viewItem.name === 'sub-app')
+                .map((viewItem) => resolveSubAppName(viewItem.path))
+                .filter(Boolean),
+        )
+        subAppNames.forEach((appName) => destroyApp(appName))
+
         visitedViews.value = []
         cachedViews.value = []
     }
