@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { computed, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { bus } from 'wujie'
 import type { MenuItem } from 'wc-utils'
-import { AppLogo } from 'wc-ui'
+import { AppLogo, OrbitLoading } from 'wc-ui'
 import {
     ThemeProvider,
     ThemeSwitcher,
@@ -34,6 +34,11 @@ const userStore = useUserStore()
 const menuStore = useMenuStore()
 const tagsStore = useTagsStore()
 const themeStore = useThemeStore()
+const pageReady = ref(false)
+
+router.isReady().then(() => {
+    pageReady.value = true
+})
 
 const isLoginPage = computed(() => route.path === '/login')
 const displayName = computed(
@@ -115,6 +120,13 @@ const handleLogout = async () => {
 
 <template>
     <ThemeProvider>
+        <OrbitLoading
+            v-if="!pageReady"
+            fullscreen
+            hint="正在启动应用"
+        />
+
+        <template v-else>
         <router-view v-if="isLoginPage" />
 
         <div v-else class="main-app">
@@ -216,6 +228,7 @@ const handleLogout = async () => {
                 </router-view>
             </main>
         </div>
+        </template>
     </ThemeProvider>
 </template>
 

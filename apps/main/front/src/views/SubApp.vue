@@ -4,7 +4,7 @@ defineOptions({ name: 'sub-app' })
 import { computed, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { bus } from 'wujie'
-import { WcWujie } from 'wc-ui'
+import { OrbitLoading, WcWujie } from 'wc-ui'
 import { useThemeStore } from 'wc-theme'
 
 const route = useRoute()
@@ -66,7 +66,11 @@ const handleSubAppReady = () => {
         :props="wujieProps"
         class="sub-app"
         @load="handleSubAppReady"
-    />
+    >
+        <template #loading>
+            <OrbitLoading :hint="`正在接入应用 · ${appName}`" />
+        </template>
+    </WcWujie>
 </template>
 
 <style lang="less" scoped>
