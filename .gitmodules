@@ -31,3 +31,6 @@
 [submodule "apps/models"]
 	path = apps/models
 	url = https://github.com/qilimazhualuo/models.git
+[submodule "packages/wc-dynamic-form"]
+	path = packages/wc-dynamic-form
+	url = https://github.com/qilimazhualuo/wc-dynamic-form.git

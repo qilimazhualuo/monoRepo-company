@@ -5,6 +5,7 @@
  *   node scripts/run-workspaces.mjs apps server --script dev
  *   node scripts/run-workspaces.mjs packages --script build -- --watch
  *   node scripts/run-workspaces.mjs --names main,sub-app --script dev
+ * 运行中（TTY）：输入 restart / r 列出服务，再输入编号重启；cancel 取消；help 查看命令
  */
 import { spawn, spawnSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
@@ -257,8 +258,8 @@ for (const target of targets) {
 
 const childRecords = []
 let shuttingDown = false
-let exitedCount = 0
 let finishedCount = 0
+let awaitingRestartPick = false
 /** @type {((value?: void) => void) | null} */
 let resolveAllFinished = null
 
@@ -294,9 +295,193 @@ const markChildFinished = (childRecord, exitText) => {
     return true
 }
 
+const waitForChildExit = (childRecord, timeoutMs = 5000) => new Promise((resolve) => {
+    if (childRecord.finished) {
+        resolve()
+        return
+    }
+
+    const onExit = () => {
+        clearTimeout(forceTimer)
+        resolve()
+    }
+
+    const forceTimer = setTimeout(() => {
+        childRecord.childProcess.off('exit', onExit)
+        console.log(`[run-workspaces] ${childRecord.label} 超时未退出，强制结束…`)
+        forceKillProcessTree(childRecord.childProcess.pid)
+        if (isWindows) {
+            killProcessTree(childRecord.childProcess.pid)
+        }
+        markChildFinished(childRecord, null)
+        resolve()
+    }, timeoutMs)
+
+    childRecord.childProcess.once('exit', onExit)
+})
+
+const attachChildListeners = (childRecord) => {
+    const { childProcess, label, packageName } = childRecord
+
+    pipeWithPrefix(label, childProcess.stdout, process.stdout)
+    pipeWithPrefix(label, childProcess.stderr, process.stderr)
+
+    childProcess.on('exit', (exitCode, signalName) => {
+        const exitText = signalName
+            ? `signal=${signalName}`
+            : `code=${exitCode ?? 0}`
+
+        if (shuttingDown) {
+            markChildFinished(childRecord, exitText)
+            return
+        }
+
+        if (childRecord.restarting) {
+            markChildFinished(childRecord, exitText)
+            return
+        }
+
+        if (!markChildFinished(childRecord, null)) return
+
+        console.log(`[run-workspaces] ${label} 退出 (${exitText})`)
+
+        if (exitCode !== 0 || signalName) {
+            void shutdown(`${label} 异常退出`)
+            return
+        }
+
+        const aliveCount = childRecords.filter((record) => !record.finished).length
+        if (aliveCount === 0) {
+            void (async () => {
+                console.log('[run-workspaces] 全部子进程正常结束，主进程退出')
+                await flushStdout()
+                process.exit(0)
+            })()
+        }
+    })
+
+    childProcess.on('error', (error) => {
+        console.error(`[run-workspaces] failed to start ${packageName}:`, error)
+        if (childRecord.restarting) {
+            markChildFinished(childRecord, null)
+            return
+        }
+        markChildFinished(childRecord, null)
+        void shutdown('启动子进程失败')
+    })
+}
+
+const spawnTarget = (target) => {
+    // Windows：shell 必须开（Node 20+ 禁裸 spawn .cmd，否则 EINVAL），
+    // 但不要 detached，否则会弹独立 CMD；windowsHide 藏住 shell 控制台。
+    // Unix：detached 进独立进程组，方便 kill(-pid) 整树清理。
+    // 输出全部 pipe 回主进程加前缀，由本脚本统一后台托管。
+    const childProcess = spawn(
+        'yarn',
+        ['workspace', target.packageName, 'run', scriptName, ...scriptArgs],
+        {
+            cwd: monorepoRoot,
+            shell: true,
+            detached: !isWindows,
+            windowsHide: true,
+            stdio: ['ignore', 'pipe', 'pipe'],
+            env: process.env,
+        },
+    )
+
+    return {
+        packageName: target.packageName,
+        label: target.label,
+        childProcess,
+        finished: false,
+        restarting: false,
+    }
+}
+
+const printRestartMenu = () => {
+    console.log('\n[run-workspaces] 可选服务：')
+    childRecords.forEach((childRecord, index) => {
+        const statusText = childRecord.finished ? '已结束' : '运行中'
+        console.log(`  ${index + 1} - ${childRecord.label} (${childRecord.packageName}) [${statusText}]`)
+    })
+    console.log('[run-workspaces] 输入数字选择要重启的服务，输入 cancel 取消')
+}
+
+const restartChildByIndex = async (serviceIndex) => {
+    const childRecord = childRecords[serviceIndex]
+    if (!childRecord) {
+        console.log('[run-workspaces] 无效编号，你是瞎选吗？')
+        return
+    }
+
+    if (childRecord.restarting) {
+        console.log(`[run-workspaces] ${childRecord.label} 正在重启中，别催`)
+        return
+    }
+
+    childRecord.restarting = true
+    console.log(`[run-workspaces] 正在重启 ${childRecord.label}…`)
+
+    if (!childRecord.finished) {
+        const processId = childRecord.childProcess.pid
+        console.log(`[run-workspaces] 正在结束 ${childRecord.label} (pid ${processId})…`)
+        killProcessTree(processId)
+        await waitForChildExit(childRecord)
+    }
+
+    const newChildRecord = spawnTarget({
+        packageName: childRecord.packageName,
+        label: childRecord.label,
+    })
+    childRecords[serviceIndex] = newChildRecord
+    // 旧进程已计入 finishedCount，替换成新进程后要重新对齐，不然关机会提前假死
+    finishedCount = childRecords.filter((record) => record.finished).length
+    attachChildListeners(newChildRecord)
+    console.log(`[run-workspaces] ${newChildRecord.label} 已重启 (pid ${newChildRecord.childProcess.pid})`)
+}
+
+const handleCommandLine = (rawLine) => {
+    const commandText = rawLine.trim().toLowerCase()
+    if (!commandText) return
+
+    if (awaitingRestartPick) {
+        if (commandText === 'cancel' || commandText === 'c') {
+            awaitingRestartPick = false
+            console.log('[run-workspaces] 已取消重启')
+            return
+        }
+
+        const selectedIndex = Number.parseInt(commandText, 10) - 1
+        if (
+            Number.isNaN(selectedIndex)
+            || selectedIndex < 0
+            || selectedIndex >= childRecords.length
+        ) {
+            console.log(`[run-workspaces] 请输入 1-${childRecords.length} 的数字，或 cancel 取消`)
+            return
+        }
+
+        awaitingRestartPick = false
+        void restartChildByIndex(selectedIndex)
+        return
+    }
+
+    if (commandText === 'restart' || commandText === 'r') {
+        awaitingRestartPick = true
+        printRestartMenu()
+        return
+    }
+
+    if (commandText === 'help' || commandText === 'h' || commandText === '?') {
+        console.log('[run-workspaces] 命令：restart / r 重启服务，help 帮助')
+        return
+    }
+}
+
 const shutdown = async (reason) => {
     if (shuttingDown) return
     shuttingDown = true
+    awaitingRestartPick = false
     console.log(`\n[run-workspaces] ${reason}，先结束全部子进程，再退出主进程…`)
 
     if (childRecords.length === 0) {
@@ -353,13 +538,18 @@ const bindShutdownSignals = () => {
     // 占住 stdin，避免 Windows 控制台 Ctrl+C 时 shell 提前吐提示符、日志糊成一团
     if (process.stdin.isTTY) {
         process.stdin.resume()
-        const readlineInterface = readline.createInterface({
+        const commandReadline = readline.createInterface({
             input: process.stdin,
             output: process.stdout,
         })
-        readlineInterface.on('SIGINT', () => {
+        commandReadline.on('SIGINT', () => {
             void shutdown('收到 Ctrl+C')
         })
+        commandReadline.on('line', (lineText) => {
+            if (shuttingDown) return
+            handleCommandLine(lineText)
+        })
+        console.log('[run-workspaces] 输入 restart 可重启指定服务，help 查看命令')
     }
 
     process.on('SIGINT', () => {
@@ -376,65 +566,7 @@ const bindShutdownSignals = () => {
 bindShutdownSignals()
 
 for (const target of targets) {
-    // Windows：shell 必须开（Node 20+ 禁裸 spawn .cmd，否则 EINVAL），
-    // 但不要 detached，否则会弹独立 CMD；windowsHide 藏住 shell 控制台。
-    // Unix：detached 进独立进程组，方便 kill(-pid) 整树清理。
-    // 输出全部 pipe 回主进程加前缀，由本脚本统一后台托管。
-    const childProcess = spawn(
-        'yarn',
-        ['workspace', target.packageName, 'run', scriptName, ...scriptArgs],
-        {
-            cwd: monorepoRoot,
-            shell: true,
-            detached: !isWindows,
-            windowsHide: true,
-            stdio: ['ignore', 'pipe', 'pipe'],
-            env: process.env,
-        },
-    )
-
-    const childRecord = {
-        label: target.label,
-        childProcess,
-        finished: false,
-    }
+    const childRecord = spawnTarget(target)
     childRecords.push(childRecord)
-
-    pipeWithPrefix(target.label, childProcess.stdout, process.stdout)
-    pipeWithPrefix(target.label, childProcess.stderr, process.stderr)
-
-    childProcess.on('exit', (exitCode, signalName) => {
-        const exitText = signalName
-            ? `signal=${signalName}`
-            : `code=${exitCode ?? 0}`
-
-        if (shuttingDown) {
-            markChildFinished(childRecord, exitText)
-            return
-        }
-
-        if (!markChildFinished(childRecord, null)) return
-
-        exitedCount += 1
-        console.log(`[run-workspaces] ${target.label} 退出 (${exitText})`)
-
-        if (exitCode !== 0 || signalName) {
-            void shutdown(`${target.label} 异常退出`)
-            return
-        }
-
-        if (exitedCount >= childRecords.length) {
-            void (async () => {
-                console.log('[run-workspaces] 全部子进程正常结束，主进程退出')
-                await flushStdout()
-                process.exit(0)
-            })()
-        }
-    })
-
-    childProcess.on('error', (error) => {
-        console.error(`[run-workspaces] failed to start ${target.packageName}:`, error)
-        markChildFinished(childRecord, null)
-        void shutdown('启动子进程失败')
-    })
+    attachChildListeners(childRecord)
 }
